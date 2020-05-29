@@ -901,13 +901,13 @@ contract CurveExchangeAdapter is GSNRecipient {
         }
     }
 
-    function mintThenDeposit(address payable _wbtcDestination, uint256[2] amounts, uint256 min_mint_amount, uint256 slippage) external {
+    function mintThenDeposit(address payable _wbtcDestination, bytes32 _nHash, bytes calldata _sig, uint256[2] calldata amounts, uint256 min_mint_amount, int128 slippage) external {
         // Mint renBTC tokens
         bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, amounts[0], _nHash, _sig);
 
         uint256 calc_token_amount = exchange.calc_token_amount(amounts, true);
-        uint256 min_mint_amount_now = calc_token_amount.mul(99).div(100)
+        uint256 min_mint_amount_now = calc_token_amount.mul(uint256(100 - slippage)).div(100);
         if(min_mint_amount_now >= min_mint_amount) {
             exchange.add_liquidity(amounts, min_mint_amount_now);
         }
@@ -926,7 +926,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
     }
 
-    function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[2] calldata amounts, uint256 max_burn_amount) {
+    function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[2] calldata amounts, uint256 max_burn_amount) external {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
         exchange.remove_liquidity_imbalance(amounts, max_burn_amount);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
@@ -936,7 +936,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
     }
 
-    function removeLiquidityOneCoin(bytes calldata _btcDestination, uint256 _token_amounts, int128 i, uint256 min_amount) {
+    function removeLiquidityOneCoin(bytes calldata _btcDestination, uint256 _token_amounts, int128 i, uint256 min_amount) external {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
         exchange.remove_liquidity_one_coin(_token_amounts, i, min_amount);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
