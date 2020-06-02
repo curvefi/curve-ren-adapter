@@ -11,6 +11,21 @@
 pragma solidity ^0.5.0;
 
 import './SafeMath.sol';
+import './Token.sol';
+
+interface IToken {
+    function balanceOf(address _owner) external view returns (uint256);
+    function approve(address _spender, uint256 _value) external returns (bool);
+
+    function mint(
+        bytes32 _pHash,
+        uint256 _amount,
+        bytes32 _nHash,
+        bytes calldata _sig
+    ) external returns (uint256);
+
+    function burn(bytes calldata _to, uint256 _amountScaled) external returns (uint256);
+}
 
 /*
  * @dev Provides information about the current execution context, including the
@@ -696,23 +711,26 @@ contract CurveExchangeAdapter is GSNRecipient {
     IERC20 WBTC;
     IERC20 curveToken;
     address owner;
+    IToken token;
 
     ICurveExchange public exchange;  
     IGatewayRegistry public registry;
 
     event Mint(uint256 value);
 
-    constructor(ICurveExchange _exchange, IGatewayRegistry _registry, IERC20 _wbtc, address _owner) public {
+    constructor(ICurveExchange _exchange, IGatewayRegistry _registry, IERC20 _wbtc, address _owner, IToken _token) public {
         exchange = _exchange;
         registry = _registry;
         RENBTC = registry.getTokenBySymbol("BTC");
         WBTC = _wbtc;
         owner = _owner;
+        token = _token;
         address curveTokenAddress = 0x49849C98ae39Fff122806C06791Fa73784FB3675;
         curveToken = IERC20(curveTokenAddress);
         
         // Approve exchange.
         require(RENBTC.approve(address(exchange), uint256(-1)));
+        require(token.approve(address(exchange), uint256(-1)));
         require(WBTC.approve(address(exchange), uint256(-1)));
     }
     
@@ -747,7 +765,10 @@ contract CurveExchangeAdapter is GSNRecipient {
     ) external {
         // Mint renBTC tokens
         bytes32 pHash = keccak256(abi.encode(_minWbtcAmount, _wbtcDestination));
-        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+        uint256 mintedAmount = token.mint(pHash, _amount, _nHash, _sig);
+        require(mintedAmount > 0, "MINTED AMOUNT WAS 0");
+        uint256 balance = token.balanceOf(address(this));
+        require(balance >= 10000, "BALANCE IS 0");
 
         emit Mint(mintedAmount);
         
@@ -773,7 +794,7 @@ contract CurveExchangeAdapter is GSNRecipient {
     function mintThenDeposit(address payable _wbtcDestination, uint256[2] calldata amounts, uint256 min_mint_amount, bytes32 _nHash, bytes calldata _sig) external {
         // Mint renBTC tokens
         bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination));
-        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, amounts[0], _nHash, _sig);
+        uint256 mintedAmount = token.mint(pHash, amounts[0], _nHash, _sig);
 
         uint256 calc_token_amount = exchange.calc_token_amount(amounts, true);
         uint256 min_mint_amount_now = calc_token_amount.mul(99).div(100);
@@ -801,7 +822,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
 
         // Burn and send proceeds to the User
-        registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
+        token.burn(_btcDestination, renbtcWithdrawn);
     }
 
     function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[2] calldata amounts, uint256 max_burn_amount) external {
@@ -822,7 +843,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         WBTC.transfer(msg.sender, wbtcWithdrawn);
 
         // Burn and send proceeds to the User
-        registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
+        token.burn(_btcDestination, renbtcWithdrawn);
     }
 
     //always removing in renBTC, else use normal method
@@ -834,7 +855,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
 
         // Burn and send proceeds to the User
-        registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
+        token.burn(_btcDestination, renbtcWithdrawn);
     }
     
     function swapThenBurn(bytes calldata _btcDestination, uint256 _amount, uint256 _minRenbtcAmount) external {
@@ -845,7 +866,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 renbtcBought = endRenbtcBalance.sub(startRenbtcBalance);
         
         // Burn and send proceeds to the User
-        registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcBought);
+        token.burn(_btcDestination, renbtcBought);
     }
 
     
