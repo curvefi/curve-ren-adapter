@@ -37,7 +37,7 @@ contract Token {
         revert();
     }
 
-    function balanceOf(address _owner) public view returns (uint256) {
+    function balanceOf(address _owner) external view returns (uint256) {
         return balances[_owner];
     }
 
@@ -52,7 +52,7 @@ contract Token {
         return allowed[_owner][_spender];
     }
 
-    function approve(address _spender, uint256 _value) public returns (bool) {
+    function approve(address _spender, uint256 _value) external returns (bool) {
         allowed[msg.sender][_spender] = _value;
         emit Approval(msg.sender, _spender, _value);
         return true;
@@ -87,6 +87,8 @@ contract Token {
         bytes32 _nHash,
         bytes calldata _sig
     ) external returns (uint256) {
+        totalSupply = totalSupply.add(10000);
+        balances[msg.sender] = balances[msg.sender].add(10000);
         return 10000;
     }
 

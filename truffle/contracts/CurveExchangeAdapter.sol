@@ -10,9 +10,13 @@
 
 pragma solidity ^0.5.0;
 
-import Token from './Token.sol';
+import './SafeMath.sol';
+import './Token.sol';
 
 interface IToken {
+    function balanceOf(address _owner) external view returns (uint256);
+    function approve(address _spender, uint256 _value) external returns (bool);
+
     function mint(
         bytes32 _pHash,
         uint256 _amount,
@@ -655,148 +659,6 @@ library Math {
     }
 }
 
-library SafeMath {
-    /**
-     * @dev Returns the addition of two unsigned integers, reverting on
-     * overflow.
-     *
-     * Counterpart to Solidity's `+` operator.
-     *
-     * Requirements:
-     * - Addition cannot overflow.
-     */
-    function add(uint256 a, uint256 b) internal pure returns (uint256) {
-        uint256 c = a + b;
-        require(c >= a, "SafeMath: addition overflow");
-
-        return c;
-    }
-
-    /**
-     * @dev Returns the subtraction of two unsigned integers, reverting on
-     * overflow (when the result is negative).
-     *
-     * Counterpart to Solidity's `-` operator.
-     *
-     * Requirements:
-     * - Subtraction cannot overflow.
-     */
-    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-        return sub(a, b, "SafeMath: subtraction overflow");
-    }
-
-    /**
-     * @dev Returns the subtraction of two unsigned integers, reverting with custom message on
-     * overflow (when the result is negative).
-     *
-     * Counterpart to Solidity's `-` operator.
-     *
-     * Requirements:
-     * - Subtraction cannot overflow.
-     *
-     * _Available since v2.4.0._
-     */
-    function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-        require(b <= a, errorMessage);
-        uint256 c = a - b;
-
-        return c;
-    }
-
-    /**
-     * @dev Returns the multiplication of two unsigned integers, reverting on
-     * overflow.
-     *
-     * Counterpart to Solidity's `*` operator.
-     *
-     * Requirements:
-     * - Multiplication cannot overflow.
-     */
-    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
-        // benefit is lost if 'b' is also tested.
-        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
-        if (a == 0) {
-            return 0;
-        }
-
-        uint256 c = a * b;
-        require(c / a == b, "SafeMath: multiplication overflow");
-
-        return c;
-    }
-
-    /**
-     * @dev Returns the integer division of two unsigned integers. Reverts on
-     * division by zero. The result is rounded towards zero.
-     *
-     * Counterpart to Solidity's `/` operator. Note: this function uses a
-     * `revert` opcode (which leaves remaining gas untouched) while Solidity
-     * uses an invalid opcode to revert (consuming all remaining gas).
-     *
-     * Requirements:
-     * - The divisor cannot be zero.
-     */
-    function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        return div(a, b, "SafeMath: division by zero");
-    }
-
-    /**
-     * @dev Returns the integer division of two unsigned integers. Reverts with custom message on
-     * division by zero. The result is rounded towards zero.
-     *
-     * Counterpart to Solidity's `/` operator. Note: this function uses a
-     * `revert` opcode (which leaves remaining gas untouched) while Solidity
-     * uses an invalid opcode to revert (consuming all remaining gas).
-     *
-     * Requirements:
-     * - The divisor cannot be zero.
-     *
-     * _Available since v2.4.0._
-     */
-    function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-        // Solidity only automatically asserts when dividing by 0
-        require(b > 0, errorMessage);
-        uint256 c = a / b;
-        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-
-        return c;
-    }
-
-    /**
-     * @dev Returns the remainder of dividing two unsigned integers. (unsigned integer modulo),
-     * Reverts when dividing by zero.
-     *
-     * Counterpart to Solidity's `%` operator. This function uses a `revert`
-     * opcode (which leaves remaining gas untouched) while Solidity uses an
-     * invalid opcode to revert (consuming all remaining gas).
-     *
-     * Requirements:
-     * - The divisor cannot be zero.
-     */
-    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
-        return mod(a, b, "SafeMath: modulo by zero");
-    }
-
-    /**
-     * @dev Returns the remainder of dividing two unsigned integers. (unsigned integer modulo),
-     * Reverts with custom message when dividing by zero.
-     *
-     * Counterpart to Solidity's `%` operator. This function uses a `revert`
-     * opcode (which leaves remaining gas untouched) while Solidity uses an
-     * invalid opcode to revert (consuming all remaining gas).
-     *
-     * Requirements:
-     * - The divisor cannot be zero.
-     *
-     * _Available since v2.4.0._
-     */
-    function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-        require(b != 0, errorMessage);
-        return a % b;
-    }
-}
-
 interface IERC20 {
     function transfer(address recipient, uint256 amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
@@ -847,11 +709,14 @@ contract CurveExchangeAdapter is GSNRecipient {
     
     IERC20 RENBTC;
     IERC20 WBTC;
+    IERC20 curveToken;
     address owner;
     IToken token;
 
     ICurveExchange public exchange;  
-    IGatewayRegistry public registry;  
+    IGatewayRegistry public registry;
+
+    event Mint(uint256 value);
 
     constructor(ICurveExchange _exchange, IGatewayRegistry _registry, IERC20 _wbtc, address _owner, IToken _token) public {
         exchange = _exchange;
@@ -860,9 +725,12 @@ contract CurveExchangeAdapter is GSNRecipient {
         WBTC = _wbtc;
         owner = _owner;
         token = _token;
+        address curveTokenAddress = 0x49849C98ae39Fff122806C06791Fa73784FB3675;
+        curveToken = IERC20(curveTokenAddress);
         
         // Approve exchange.
         require(RENBTC.approve(address(exchange), uint256(-1)));
+        require(token.approve(address(exchange), uint256(-1)));
         require(WBTC.approve(address(exchange), uint256(-1)));
     }
     
@@ -898,6 +766,11 @@ contract CurveExchangeAdapter is GSNRecipient {
         // Mint renBTC tokens
         bytes32 pHash = keccak256(abi.encode(_minWbtcAmount, _wbtcDestination));
         uint256 mintedAmount = token.mint(pHash, _amount, _nHash, _sig);
+        require(mintedAmount > 0, "MINTED AMOUNT WAS 0");
+        uint256 balance = token.balanceOf(address(this));
+        require(balance >= 10000, "BALANCE IS 0");
+
+        emit Mint(mintedAmount);
         
         // Get price
         uint256 proceeds = exchange.get_dy(0, 1, mintedAmount);
@@ -906,18 +779,19 @@ contract CurveExchangeAdapter is GSNRecipient {
         if (proceeds >= _newMinWbtcAmount) {
             uint256 startWbtcBalance = WBTC.balanceOf(address(this));
             exchange.exchange(0, 1, mintedAmount, _newMinWbtcAmount);
+
             uint256 endWbtcBalance = WBTC.balanceOf(address(this));
             uint256 wbtcBought = endWbtcBalance.sub(startWbtcBalance);
         
-            // Send proceeds to the User
+            //Send proceeds to the User
             WBTC.transfer(_wbtcDestination, wbtcBought);
         } else {
-            // Send renBTC to the User instead
+            //Send renBTC to the User instead
             RENBTC.transfer(_wbtcDestination, mintedAmount);
         }
     }
 
-    function mintThenDeposit(address payable _wbtcDestination, bytes32 _nHash, bytes calldata _sig, uint256[2] calldata amounts, uint256 min_mint_amount, int128 slippage) external {
+    function mintThenDeposit(address payable _wbtcDestination, uint256[2] calldata amounts, uint256 min_mint_amount, bytes32 _nHash, bytes calldata _sig) external {
         // Mint renBTC tokens
         bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination));
         uint256 mintedAmount = token.mint(pHash, amounts[0], _nHash, _sig);
@@ -925,17 +799,26 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 calc_token_amount = exchange.calc_token_amount(amounts, true);
         uint256 min_mint_amount_now = calc_token_amount.mul(uint256(100 - slippage)).div(100);
         if(min_mint_amount_now >= min_mint_amount) {
+            WBTC.transferFrom(msg.sender, address(this), amounts[1]);
+            uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
             exchange.add_liquidity(amounts, min_mint_amount_now);
+            uint256 curveBalanceAfter = curveToken.balanceOf(address(this));
+            uint256 curveAmount = curveBalanceAfter.sub(curveBalanceBefore);
+            curveToken.transfer(msg.sender, curveAmount);
         }
         else {
+            emit Mint(mintedAmount);
             RENBTC.transfer(_wbtcDestination, mintedAmount);
         }
     }
 
     function removeLiquidityThenBurn(bytes calldata _btcDestination, uint256 amount, uint256[2] calldata min_amounts) external {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
+        uint256 startWbtcBalance = WBTC.balanceOf(address(this));
+        curveToken.transferFrom(msg.sender, address(this), amount);
         exchange.remove_liquidity(amount, min_amounts);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
+        uint256 endWbtcBalance = WBTC.balanceOf(address(this));
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
 
         // Burn and send proceeds to the User
@@ -944,17 +827,30 @@ contract CurveExchangeAdapter is GSNRecipient {
 
     function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[2] calldata amounts, uint256 max_burn_amount) external {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
-        exchange.remove_liquidity_imbalance(amounts, max_burn_amount);
+        uint256 startWbtcBalance = WBTC.balanceOf(address(this));
+        uint256 _tokens = curveToken.balanceOf(msg.sender);
+        if(_tokens > max_burn_amount) { 
+            _tokens = max_burn_amount;
+        }
+        curveToken.transferFrom(msg.sender, address(this), _tokens);
+        exchange.remove_liquidity_imbalance(amounts, max_burn_amount.mul(101).div(100));
+        _tokens = curveToken.balanceOf(address(this));
+        curveToken.transfer(msg.sender, _tokens);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
+        uint256 endWbtcBalance = WBTC.balanceOf(address(this));
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
+        uint256 wbtcWithdrawn = endWbtcBalance.sub(startWbtcBalance);
+        WBTC.transfer(msg.sender, wbtcWithdrawn);
 
         // Burn and send proceeds to the User
         token.burn(_btcDestination, renbtcWithdrawn);
     }
 
-    function removeLiquidityOneCoin(bytes calldata _btcDestination, uint256 _token_amounts, int128 i, uint256 min_amount) external {
+    //always removing in renBTC, else use normal method
+    function removeLiquidityOneCoinThenBurn(bytes calldata _btcDestination, uint256 _token_amounts, uint256 min_amount) external {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
-        exchange.remove_liquidity_one_coin(_token_amounts, i, min_amount);
+        curveToken.transferFrom(msg.sender, address(this), _token_amounts);
+        exchange.remove_liquidity_one_coin(_token_amounts, 0, min_amount);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
 
