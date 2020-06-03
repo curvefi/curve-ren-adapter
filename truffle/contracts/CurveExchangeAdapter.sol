@@ -779,11 +779,10 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256[2] memory receivedAmounts = amounts;
         receivedAmounts[0] = mintedAmount;
         uint256 calc_token_amount = exchange.calc_token_amount(receivedAmounts, true);
-        uint256 min_mint_amount_now = calc_token_amount.mul(99).div(100);
-        if(min_mint_amount_now >= min_mint_amount) {
+        if(calc_token_amount >= min_mint_amount) {
             WBTC.transferFrom(msg.sender, address(this), amounts[1]);
             uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
-            exchange.add_liquidity(amounts, min_mint_amount_now);
+            exchange.add_liquidity(amounts, 0);
             uint256 curveBalanceAfter = curveToken.balanceOf(address(this));
             uint256 curveAmount = curveBalanceAfter.sub(curveBalanceBefore);
             curveToken.transfer(msg.sender, curveAmount);
