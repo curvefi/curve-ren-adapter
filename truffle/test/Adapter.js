@@ -149,10 +149,14 @@ contract('Curve Protocol', async accounts => {
 
 		let balance =  BN(await swapTokenContract.methods.balanceOf(account).call())
 		let amount = BN(balance).times(BN(0.1)).toFixed(0,1)
+		let wbtcBalance = BN(await wbtcContract.methods.balanceOf(account).call())
 
 		await swapTokenContract.methods.approve(contract.address, amount).send({from: account, gasLimit: 1000000 })
 
-		let receipt = await contract.removeLiquidityThenBurn('0x30', amount, [1,1])
+		let receipt = await contract.removeLiquidityThenBurn('0x30', amount, [100,100])
+		let endwbtcBalance = BN(await wbtcContract.methods.balanceOf(account).call())
+		let wbtcWithdrawn = endwbtcBalance.minus(wbtcBalance)
+		wbtcWithdrawn.should.be.bignumber.at.least(BN(100))
 
 		let balanceAfter = BN(await swapTokenContract.methods.balanceOf(account).call())
 		
