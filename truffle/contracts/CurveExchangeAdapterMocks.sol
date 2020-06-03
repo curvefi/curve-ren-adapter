@@ -784,10 +784,10 @@ contract CurveExchangeAdapter is GSNRecipient {
             uint256 wbtcBought = endWbtcBalance.sub(startWbtcBalance);
         
             //Send proceeds to the User
-            WBTC.transfer(_wbtcDestination, wbtcBought);
+            require(WBTC.transfer(_wbtcDestination, wbtcBought));
         } else {
             //Send renBTC to the User instead
-            RENBTC.transfer(_wbtcDestination, mintedAmount);
+            require(RENBTC.transfer(_wbtcDestination, mintedAmount));
         }
     }
 
@@ -802,28 +802,28 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 calc_token_amount = exchange.calc_token_amount(receivedAmounts, true);
         uint256 min_mint_amount_now = calc_token_amount.mul(99).div(100);
         if(min_mint_amount_now >= min_mint_amount) {
-            WBTC.transferFrom(msg.sender, address(this), receivedAmounts[1]);
+            require(WBTC.transferFrom(msg.sender, address(this), receivedAmounts[1]));
             uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
             exchange.add_liquidity(receivedAmounts, min_mint_amount_now);
             uint256 curveBalanceAfter = curveToken.balanceOf(address(this));
             uint256 curveAmount = curveBalanceAfter.sub(curveBalanceBefore);
-            curveToken.transfer(msg.sender, curveAmount);
+            require(curveToken.transfer(msg.sender, curveAmount));
         }
         else {
             emit Mint(mintedAmount);
-            RENBTC.transfer(_wbtcDestination, mintedAmount);
+            require(RENBTC.transfer(_wbtcDestination, mintedAmount));
         }
     }
 
     function removeLiquidityThenBurn(bytes calldata _btcDestination, uint256 amount, uint256[2] calldata min_amounts) external {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
         uint256 startWbtcBalance = WBTC.balanceOf(address(this));
-        curveToken.transferFrom(msg.sender, address(this), amount);
+        require(curveToken.transferFrom(msg.sender, address(this), amount));
         exchange.remove_liquidity(amount, min_amounts);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
         uint256 endWbtcBalance = WBTC.balanceOf(address(this));
         uint256 wbtcWithdrawn = endWbtcBalance.sub(startWbtcBalance);
-        WBTC.transfer(msg.sender, wbtcWithdrawn);
+        require(WBTC.transfer(msg.sender, wbtcWithdrawn));
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
 
         // Burn and send proceeds to the User
@@ -837,16 +837,16 @@ contract CurveExchangeAdapter is GSNRecipient {
         if(_tokens > max_burn_amount) { 
             _tokens = max_burn_amount;
         }
-        curveToken.transferFrom(msg.sender, address(this), _tokens);
+        require(curveToken.transferFrom(msg.sender, address(this), _tokens));
         exchange.remove_liquidity_imbalance(amounts, max_burn_amount.mul(101).div(100));
         _tokens = curveToken.balanceOf(address(this));
-        curveToken.transfer(msg.sender, _tokens);
+        require(curveToken.transfer(msg.sender, _tokens));
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
         uint256 endWbtcBalance = WBTC.balanceOf(address(this));
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
         uint256 wbtcWithdrawn = endWbtcBalance.sub(startWbtcBalance);
         emit Mint(wbtcWithdrawn);
-        WBTC.transfer(msg.sender, wbtcWithdrawn);
+        require(WBTC.transfer(msg.sender, wbtcWithdrawn));
 
         // Burn and send proceeds to the User
         token.burn(_btcDestination, renbtcWithdrawn);
@@ -855,7 +855,7 @@ contract CurveExchangeAdapter is GSNRecipient {
     //always removing in renBTC, else use normal method
     function removeLiquidityOneCoinThenBurn(bytes calldata _btcDestination, uint256 _token_amounts, uint256 min_amount) external {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
-        curveToken.transferFrom(msg.sender, address(this), _token_amounts);
+        require(curveToken.transferFrom(msg.sender, address(this), _token_amounts));
         exchange.remove_liquidity_one_coin(_token_amounts, 0, min_amount);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
@@ -866,7 +866,7 @@ contract CurveExchangeAdapter is GSNRecipient {
     }
     
     function swapThenBurn(bytes calldata _btcDestination, uint256 _amount, uint256 _minRenbtcAmount) external {
-        WBTC.transferFrom(msg.sender, address(this), _amount);
+        require(WBTC.transferFrom(msg.sender, address(this), _amount));
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
         exchange.exchange(1, 0, _amount, _minRenbtcAmount);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
@@ -874,10 +874,5 @@ contract CurveExchangeAdapter is GSNRecipient {
         
         // Burn and send proceeds to the User
         token.burn(_btcDestination, renbtcBought);
-    }
-
-    
-    function () external payable {
-        require(msg.sender == address(exchange), "only allow exchange to transfer eth into this contract");
     }
 }

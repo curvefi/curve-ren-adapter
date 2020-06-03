@@ -849,9 +849,4 @@ contract CurveExchangeAdapter is GSNRecipient {
         // Burn and send proceeds to the User
         registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcBought);
     }
-
-    
-    function () external payable {
-        require(msg.sender == address(exchange), "only allow exchange to transfer eth into this contract");
-    }
 }
