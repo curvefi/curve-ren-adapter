@@ -617,8 +617,6 @@ contract GSNRecipient is IRelayRecipient, Context {
 
 // File: browser/dex-adapter-simple.sol
 
-pragma solidity ^0.5.8;
-
 library Math {
     /**
      * @dev Returns the largest of two numbers.
@@ -699,7 +697,8 @@ contract CurveExchangeAdapter is GSNRecipient {
     ICurveExchange public exchange;  
     IGatewayRegistry public registry;
 
-    event Mint(uint256 value);
+    event Mint(uint256 mintValue);
+    event Burn(uint256 burnValue);
 
     constructor(ICurveExchange _exchange, IGatewayRegistry _registry, IERC20 _wbtc) public {
         exchange = _exchange;
@@ -773,6 +772,8 @@ contract CurveExchangeAdapter is GSNRecipient {
         bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, amounts[0], _nHash, _sig);
 
+        emit Mint(mintedAmount);
+
         //set renBTC to actual minted amount, should be the same from UI call
         uint256[2] memory receivedAmounts = amounts;
         receivedAmounts[0] = mintedAmount;
@@ -786,7 +787,6 @@ contract CurveExchangeAdapter is GSNRecipient {
             require(curveToken.transfer(msg.sender, curveAmount));
         }
         else {
-            emit Mint(mintedAmount);
             require(RENBTC.transfer(_wbtcDestination, mintedAmount));
         }
     }
@@ -803,7 +803,8 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
 
         // Burn and send proceeds to the User
-        registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
+        uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
+        emit Burn(burnAmount);
     }
 
     function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[2] calldata amounts, uint256 max_burn_amount) external {
@@ -824,7 +825,8 @@ contract CurveExchangeAdapter is GSNRecipient {
         require(WBTC.transfer(msg.sender, wbtcWithdrawn));
 
         // Burn and send proceeds to the User
-        registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
+        uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
+        emit Burn(burnAmount);
     }
 
     //always removing in renBTC, else use normal method
@@ -836,7 +838,8 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
 
         // Burn and send proceeds to the User
-        registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
+        uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
+        emit Burn(burnAmount);
     }
     
     function swapThenBurn(bytes calldata _btcDestination, uint256 _amount, uint256 _minRenbtcAmount) external {
@@ -847,6 +850,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 renbtcBought = endRenbtcBalance.sub(startRenbtcBalance);
         
         // Burn and send proceeds to the User
-        registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcBought);
+        uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcBought);
+        emit Burn(burnAmount);
     }
 }
