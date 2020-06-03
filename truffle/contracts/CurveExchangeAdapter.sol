@@ -800,6 +800,8 @@ contract CurveExchangeAdapter is GSNRecipient {
         exchange.remove_liquidity(amount, min_amounts);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
         uint256 endWbtcBalance = WBTC.balanceOf(address(this));
+        uint256 wbtcWithdrawn = endWbtcBalance.sub(startWbtcBalance);
+        WBTC.transfer(msg.sender, wbtcWithdrawn);
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
 
         // Burn and send proceeds to the User
