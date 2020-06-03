@@ -695,19 +695,17 @@ contract CurveExchangeAdapter is GSNRecipient {
     IERC20 RENBTC;
     IERC20 WBTC;
     IERC20 curveToken;
-    address owner;
 
     ICurveExchange public exchange;  
     IGatewayRegistry public registry;
 
     event Mint(uint256 value);
 
-    constructor(ICurveExchange _exchange, IGatewayRegistry _registry, IERC20 _wbtc, address _owner) public {
+    constructor(ICurveExchange _exchange, IGatewayRegistry _registry, IERC20 _wbtc) public {
         exchange = _exchange;
         registry = _registry;
         RENBTC = registry.getTokenBySymbol("BTC");
         WBTC = _wbtc;
-        owner = _owner;
         address curveTokenAddress = 0x49849C98ae39Fff122806C06791Fa73784FB3675;
         curveToken = IERC20(curveTokenAddress);
         
