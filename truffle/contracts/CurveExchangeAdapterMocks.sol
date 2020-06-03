@@ -796,12 +796,15 @@ contract CurveExchangeAdapter is GSNRecipient {
         bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination));
         uint256 mintedAmount = token.mint(pHash, amounts[0], _nHash, _sig);
 
-        uint256 calc_token_amount = exchange.calc_token_amount(amounts, true);
+        //set renBTC to actual minted amount, should be the same from UI call
+        uint256[2] memory receivedAmounts = amounts;
+        receivedAmounts[0] = mintedAmount;
+        uint256 calc_token_amount = exchange.calc_token_amount(receivedAmounts, true);
         uint256 min_mint_amount_now = calc_token_amount.mul(99).div(100);
         if(min_mint_amount_now >= min_mint_amount) {
-            WBTC.transferFrom(msg.sender, address(this), amounts[1]);
+            WBTC.transferFrom(msg.sender, address(this), receivedAmounts[1]);
             uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
-            exchange.add_liquidity(amounts, min_mint_amount_now);
+            exchange.add_liquidity(receivedAmounts, min_mint_amount_now);
             uint256 curveBalanceAfter = curveToken.balanceOf(address(this));
             uint256 curveAmount = curveBalanceAfter.sub(curveBalanceBefore);
             curveToken.transfer(msg.sender, curveAmount);
@@ -840,6 +843,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 endWbtcBalance = WBTC.balanceOf(address(this));
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
         uint256 wbtcWithdrawn = endWbtcBalance.sub(startWbtcBalance);
+        emit Mint(wbtcWithdrawn);
         WBTC.transfer(msg.sender, wbtcWithdrawn);
 
         // Burn and send proceeds to the User
@@ -853,6 +857,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         exchange.remove_liquidity_one_coin(_token_amounts, 0, min_amount);
         uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
+        emit Mint(renbtcWithdrawn);
 
         // Burn and send proceeds to the User
         token.burn(_btcDestination, renbtcWithdrawn);

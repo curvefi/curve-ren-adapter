@@ -5,6 +5,10 @@ const swap_abi = require('./abi/swap')
 const { ether, balance } = require('openzeppelin-test-helpers');
 
 const BN = require('bignumber.js')
+const chai = require('chai')
+const expect = chai.expect
+chai.should()
+chai.use(require('chai-bignumber')(BN));
 
 let curve = '0x93054188d876f558f4a66B2EF1d97d16eDf0895B'
 let registry = '0xe80d347df1209a76dd9d2319d62912ba98c54ddd'
@@ -81,9 +85,9 @@ contract('Curve Protocol', async accounts => {
 		await renContract.methods
 			.transfer(contract.address, '100000')
 			.send({ from: accounts[0], gasLimit: 800000 });
-		await wbtcContract.methods
-			.transfer(contract.address, '100000')
-			.send({ from: accounts[0], gasLimit: 800000 });
+		// await wbtcContract.methods
+		// 	.transfer(contract.address, '100000')
+		// 	.send({ from: accounts[0], gasLimit: 800000 });
 	})
 
 	it('should exchange', async () => {
@@ -95,16 +99,22 @@ contract('Curve Protocol', async accounts => {
 			.transfer(contract.address, '100000')
 			.send({ from: accounts[0], gasLimit: 800000 });
 
-		console.log(await wbtcContract.methods.balanceOf(account).call())
-		let receipt = await contract.mintThenSwap(0, 0, account, 1, "0x30", "0x30", { from: account })
-		console.log(receipt)
-		console.log(await wbtcContract.methods.balanceOf(account).call())
+		let amount = BN(1e4).toFixed(0,1)
+		let min_amount = BN(amount).times(BN(0.99)).toFixed(0,1)
+		let wbtcBalance = BN(await wbtcContract.methods.balanceOf(account).call())
+		let receipt = await contract.mintThenSwap(min_amount, min_amount, account, amount, "0x30", "0x30", { from: account })
+		let endwbtcBalance = BN(await wbtcContract.methods.balanceOf(account).call())
+		let wbtcReceived = endwbtcBalance.minus(wbtcBalance)
+		wbtcReceived.should.be.bignumber.at.least(BN(min_amount))
 
-		//make if fail and check renBTC balance
-		console.log(await renContract.methods.balanceOf(account).call())
-		let receipt2 = await contract.mintThenSwap(0, 100000, account, 1, "0x30", "0x30", { from: account })
-		console.log(await renContract.methods.balanceOf(account).call())
-
+		//make it fail and check renBTC balance
+		let renBalance = BN(await renContract.methods.balanceOf(account).call())
+		min_amount = BN(min_amount).times(100).toFixed(0,1)
+		let receipt2 = await contract.mintThenSwap(min_amount, min_amount, account, amount, "0x30", "0x30", { from: account })
+		let endRenBalance = BN(await renContract.methods.balanceOf(account).call())
+		//mock mint is always 10000
+		let renReceived = endRenBalance.minus(renBalance)
+		renReceived.should.be.bignumber.equal(BN(10000))
 	});
 
 	it('should add liquidity', async () => {
@@ -113,29 +123,41 @@ contract('Curve Protocol', async accounts => {
 
 		let amounts = ["10000", "10000"]
 
-		let receipt = await contract.mintThenDeposit(account, amounts, 0, "0x30", "0x30", { from: account })
-		console.log(receipt)
-		console.log(await swapTokenContract.methods.balanceOf(account).call())
+		let calc_token_amount =  BN(await swapContract.methods.calc_token_amount(amounts, true).call())
+		let min_mint_amount = calc_token_amount.times(BN(0.99))
 
-		console.log(await swapContract.methods.calc_token_amount(amounts, true).call())
 
-		console.log(await renContract.methods.balanceOf(account).call())
+		let curveBalance = BN(await swapTokenContract.methods.balanceOf(account).call())
+		let receipt = await contract.mintThenDeposit(account, amounts, min_mint_amount.toFixed(0,1), "0x30", "0x30", { from: account })
+		let endCurveBalance = BN(await swapTokenContract.methods.balanceOf(account).call())
+		let curveReceived = endCurveBalance.minus(curveBalance)
+		curveReceived.should.be.bignumber.at.least(min_mint_amount)
+
+
+		//make it fail with a larger min mint amount
+		let renBalance = BN(await renContract.methods.balanceOf(account).call())
 		let receipt2 = await contract.mintThenDeposit(account, amounts, "1099864718376454", "0x30", "0x30", { from: account })
-		console.log(await renContract.methods.balanceOf(account).call())
+		let endRenBalance = BN(await renContract.methods.balanceOf(account).call())
+		let renReceived = endRenBalance.minus(renBalance)
+		//mock mint is always 10000
+		renReceived.should.be.bignumber.equal(10000)
 	})
 
 	it('should remove liquidity', async() => {
 		let account = accounts[0]
 		let contract = await CurveAdapter.deployed()
 
-		let balance = await swapTokenContract.methods.balanceOf(account).call()
+		let balance =  BN(await swapTokenContract.methods.balanceOf(account).call())
+		let amount = BN(balance).times(BN(0.1)).toFixed(0,1)
 
-		await swapTokenContract.methods.approve(contract.address, balance).send({from: account, gasLimit: 1000000 })
+		await swapTokenContract.methods.approve(contract.address, amount).send({from: account, gasLimit: 1000000 })
 
-		let receipt = await contract.removeLiquidityThenBurn('0x30', BN(balance).div(2).toFixed(0,1), [1,1])
+		let receipt = await contract.removeLiquidityThenBurn('0x30', amount, [1,1])
 
-		let balanceAfter = await swapTokenContract.methods.balanceOf(account).call()
-		console.log(balanceAfter)
+		let balanceAfter = BN(await swapTokenContract.methods.balanceOf(account).call())
+		
+		let burnedBalance = balanceAfter.minus(balance)
+		burnedBalance.should.be.bignumber.at.most(BN(amount))
 	})
 
 	it('should remove liquidity imbalance', async() => {
@@ -143,14 +165,20 @@ contract('Curve Protocol', async accounts => {
 		let contract = await CurveAdapter.deployed()
 
 		let balance = await swapTokenContract.methods.balanceOf(account).call()
-		console.log(balance)
-
+		let wbtcBalance = BN(await wbtcContract.methods.balanceOf(account).call())
+		let renBalance = BN(await renContract.methods.balanceOf(account).call())
 		await swapTokenContract.methods.approve(contract.address, balance).send({from: account, gasLimit: 1000000 })
 
-		let receipt = await contract.removeLiquidityImbalanceThenBurn('0x30', [1,1], BN(balance).div(2).toFixed(0,1))
+		let receipt = await contract.removeLiquidityImbalanceThenBurn('0x30', [1000,1000], BN(balance).div(2).toFixed(0,1))
+		let endwbtcBalance = BN(await wbtcContract.methods.balanceOf(account).call())
+		let endrenBalance = BN(await renContract.methods.balanceOf(account).call())
 
-		let balanceAfter = await swapTokenContract.methods.balanceOf(account).call()
-		console.log(balanceAfter)
+
+		let wbtcWithdrawn = endwbtcBalance.minus(wbtcBalance)
+		let renWithdrawn = endrenBalance.minus(renBalance)
+
+		wbtcWithdrawn.should.be.bignumber.at.least(BN(1000))
+		renWithdrawn.should.be.bignumber.equal(0)
 	})
 
 	it('should remove liquidity in one coin', async() => {
@@ -160,23 +188,18 @@ contract('Curve Protocol', async accounts => {
 		let balance = await swapTokenContract.methods.balanceOf(account).call()
 		console.log(balance)
 
-		await swapTokenContract.methods.approve(contract.address, balance).send({from: account, gasLimit: 1000000 })
+		await swapTokenContract.methods.approve(contract.address, BN(balance).toFixed(0,1)).send({from: account, gasLimit: 1000000 })
+		let calc_token_amount = BN(await swapContract.methods.calc_withdraw_one_coin(BN(balance).toFixed(0,1), 0).call())
+		console.log(calc_token_amount)
+		let min_amount = calc_token_amount.times(BN(0.99)).toFixed(0,1)
+		let renBalance = BN(await renContract.methods.balanceOf(account).call())
 
-		let receipt = await contract.removeLiquidityOneCoinThenBurn('0x30', balance, 1000)
+		let receipt = await contract.removeLiquidityOneCoinThenBurn('0x30', balance, min_amount)
+		let endrenBalance = BN(await renContract.methods.balanceOf(account).call())
+		let renWithdrawn = endrenBalance.minus(renBalance)
+		renWithdrawn.should.be.bignumber.equal(0)
 
-		let balanceAfter = await swapTokenContract.methods.balanceOf(account).call()
-		console.log(balanceAfter)
-	})
-
-	it('should remove liquidity in one coin', async() => {
-		let account = accounts[0]
-		let contract = await CurveProtocol.deployed()
-
-		let daiBalance = await daiContract.methods.balanceOf(contract.address).call()
-		let receipt = await contract.remove_liquidity_one_coin("100000000000", 0, 1, { from: account })
-		let withdrawnAmount = receipt.logs[0].args.withdrawnAmount.toString()
-		let daiBalanceAfter = await daiContract.methods.balanceOf(contract.address).call()
-
-		console.log(+daiBalance, +daiBalanceAfter, +withdrawnAmount)
+		let balanceAfter = +(await swapTokenContract.methods.balanceOf(account).call())
+		balanceAfter.should.be.equal(0);
 	})
 });

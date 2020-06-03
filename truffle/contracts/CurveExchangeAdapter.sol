@@ -775,7 +775,10 @@ contract CurveExchangeAdapter is GSNRecipient {
         bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, amounts[0], _nHash, _sig);
 
-        uint256 calc_token_amount = exchange.calc_token_amount(amounts, true);
+        //set renBTC to actual minted amount, should be the same from UI call
+        uint256[2] memory receivedAmounts = amounts;
+        receivedAmounts[0] = mintedAmount;
+        uint256 calc_token_amount = exchange.calc_token_amount(receivedAmounts, true);
         uint256 min_mint_amount_now = calc_token_amount.mul(99).div(100);
         if(min_mint_amount_now >= min_mint_amount) {
             WBTC.transferFrom(msg.sender, address(this), amounts[1]);
