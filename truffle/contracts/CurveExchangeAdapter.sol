@@ -773,7 +773,7 @@ contract CurveExchangeAdapterMainnet is GSNRecipient {
 
     function mintThenDeposit(address payable _wbtcDestination, uint256 _amount, uint256[2] calldata amounts, uint256 min_mint_amount, uint256 new_min_mint_amount, bytes32 _nHash, bytes calldata _sig) external {
         // Mint renBTC tokens
-        bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination));
+        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, amounts, min_mint_amount));
         //use actual _amount the user sent
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
 
