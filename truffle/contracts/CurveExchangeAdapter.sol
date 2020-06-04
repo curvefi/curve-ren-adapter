@@ -771,7 +771,7 @@ contract CurveExchangeAdapterMainnet is GSNRecipient {
         }
     }
 
-    function mintThenDeposit(address payable _wbtcDestination, uint256 _amount, uint256[2] calldata amounts, uint256 min_mint_amount, bytes32 _nHash, bytes calldata _sig) external {
+    function mintThenDeposit(address payable _wbtcDestination, uint256 _amount, uint256[2] calldata amounts, uint256 min_mint_amount, uint256 new_min_mint_amount, bytes32 _nHash, bytes calldata _sig) external {
         // Mint renBTC tokens
         bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination));
         //use actual _amount the user sent
@@ -783,12 +783,13 @@ contract CurveExchangeAdapterMainnet is GSNRecipient {
         uint256[2] memory receivedAmounts = amounts;
         receivedAmounts[0] = mintedAmount;
         uint256 calc_token_amount = exchange.calc_token_amount(amounts, true);
-        if(calc_token_amount >= min_mint_amount) {
+        if(calc_token_amount >= new_min_mint_amount) {
             require(WBTC.transferFrom(msg.sender, address(this), receivedAmounts[1]));
             uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
             exchange.add_liquidity(receivedAmounts, 0);
             uint256 curveBalanceAfter = curveToken.balanceOf(address(this));
             uint256 curveAmount = curveBalanceAfter.sub(curveBalanceBefore);
+            require(curveAmount >= new_min_mint_amount);
             require(curveToken.transfer(msg.sender, curveAmount));
         }
         else {
