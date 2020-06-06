@@ -687,7 +687,7 @@ interface ICurveExchange {
     function remove_liquidity_one_coin(uint256 _token_amounts, int128 i, uint256 min_amount) external;
 }
 
-contract CurveExchangeAdapterMainnet is GSNRecipient {
+contract CurveExchangeAdapter is GSNRecipient {
     using SafeMath for uint256;
     
     IERC20 RENBTC;
@@ -738,13 +738,14 @@ contract CurveExchangeAdapterMainnet is GSNRecipient {
         uint256 _minExchangeRate,
         uint256 _newMinExchangeRate,
         uint256 slippage,
+        bytes32 secret,
         address payable _wbtcDestination,
         uint256 _amount,
         bytes32 _nHash,
         bytes calldata _sig
     ) external {
         // Mint renBTC tokens
-        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, slippage, _wbtcDestination));
+        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, slippage, _wbtcDestination, secret));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
 
         emit Mint(mintedAmount);
@@ -771,9 +772,17 @@ contract CurveExchangeAdapterMainnet is GSNRecipient {
         }
     }
 
-    function mintThenDeposit(address payable _wbtcDestination, uint256 _amount, uint256[2] calldata amounts, uint256 min_mint_amount, uint256 new_min_mint_amount, bytes32 _nHash, bytes calldata _sig) external {
+    function mintThenDeposit(
+        address payable _wbtcDestination, 
+        uint256 _amount, 
+        uint256[2] calldata amounts, 
+        uint256 min_mint_amount, 
+        uint256 new_min_mint_amount, 
+        bytes32 secret,
+        bytes32 _nHash, 
+        bytes calldata _sig) external {
         // Mint renBTC tokens
-        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, amounts, min_mint_amount));
+        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, amounts, min_mint_amount, secret));
         //use actual _amount the user sent
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
 

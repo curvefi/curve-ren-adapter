@@ -760,13 +760,14 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 _minExchangeRate,
         uint256 _newMinExchangeRate,
         uint256 slippage,
+        bytes32 secret,
         address payable _wbtcDestination,
         uint256 _amount,
         bytes32 _nHash,
         bytes calldata _sig
     ) external {
         // Mint renBTC tokens
-        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _wbtcDestination));
+        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, slippage, _wbtcDestination, secret));
         uint256 mintedAmount = token.mint(pHash, _amount, _nHash, _sig);
         require(mintedAmount > 0, "MINTED AMOUNT WAS 0");
         uint256 balance = token.balanceOf(address(this));
@@ -798,9 +799,17 @@ contract CurveExchangeAdapter is GSNRecipient {
         }
     }
 
-    function mintThenDeposit(address payable _wbtcDestination, uint256 _amount, uint256[2] calldata amounts, uint256 min_mint_amount, uint256 new_min_mint_amount, bytes32 _nHash, bytes calldata _sig) external {
+    function mintThenDeposit(
+        address payable _wbtcDestination, 
+        uint256 _amount, 
+        uint256[2] calldata amounts, 
+        uint256 min_mint_amount, 
+        uint256 new_min_mint_amount,
+        bytes32 secret,
+        bytes32 _nHash, 
+        bytes calldata _sig) external {
         // Mint renBTC tokens
-        bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination));
+        bytes32 pHash = keccak256(abi.encode(amounts, min_mint_amount, _wbtcDestination, secret));
         uint256 mintedAmount = token.mint(pHash, _amount, _nHash, _sig);
         emit Mint(mintedAmount);
 
