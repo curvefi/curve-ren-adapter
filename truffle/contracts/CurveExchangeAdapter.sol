@@ -697,8 +697,10 @@ contract CurveExchangeAdapter is GSNRecipient {
     ICurveExchange public exchange;  
     IGatewayRegistry public registry;
 
-    event Mint(uint256 mintValue);
-    event Burn(uint256 burnValue);
+    event SwapReceived(uint256 mintedAmount, uint256 wbtcAmount);
+    event DepositMintedCurve(uint256 mintedAmount, uint256 curveAmount);
+    event ReceiveRen(uint256 renAmount);
+    event Burn(uint256 burnAmount);
 
     constructor(ICurveExchange _exchange, IGatewayRegistry _registry, IERC20 _wbtc) public {
         exchange = _exchange;
@@ -737,23 +739,21 @@ contract CurveExchangeAdapter is GSNRecipient {
     function mintThenSwap(
         uint256 _minExchangeRate,
         uint256 _newMinExchangeRate,
-        uint256 slippage,
+        uint256 _slippage,
         address payable _wbtcDestination,
         uint256 _amount,
         bytes32 _nHash,
         bytes calldata _sig
     ) external {
         // Mint renBTC tokens
-        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, slippage, _wbtcDestination, _msgSender()));
+        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _wbtcDestination, _msgSender()));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
-
-        emit Mint(mintedAmount);
         
         // Get price
         uint256 dy = exchange.get_dy(0, 1, mintedAmount);
         uint256 rate = dy.mul(1e8).div(mintedAmount);
-        slippage = 1e4 - slippage;
-        uint256 min_dy = mintedAmount.mul(rate).div(1e8).mul(slippage).div(1e4);
+        _slippage = uint256(1e4).sub(_slippage);
+        uint256 min_dy = mintedAmount.mul(rate).div(1e8).mul(_slippage).div(1e4);
         
         // Price is OK
         if (rate >= _newMinExchangeRate) {
@@ -765,43 +765,80 @@ contract CurveExchangeAdapter is GSNRecipient {
         
             //Send proceeds to the User
             require(WBTC.transfer(_wbtcDestination, wbtcBought));
+            emit SwapReceived(mintedAmount, wbtcBought);
         } else {
             //Send renBTC to the User instead
             require(RENBTC.transfer(_wbtcDestination, mintedAmount));
+            emit ReceiveRen(mintedAmount);
         }
     }
 
     function mintThenDeposit(
         address payable _wbtcDestination, 
         uint256 _amount, 
-        uint256[2] calldata amounts, 
-        uint256 min_mint_amount, 
-        uint256 new_min_mint_amount, 
+        uint256[2] calldata _amounts, 
+        uint256 _min_mint_amount, 
+        uint256 _new_min_mint_amount, 
         bytes32 _nHash, 
-        bytes calldata _sig) external {
+        bytes calldata _sig
+    ) external {
         // Mint renBTC tokens
-        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, amounts, min_mint_amount, _msgSender()));
+        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, _amounts, _min_mint_amount, _msgSender()));
         //use actual _amount the user sent
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
 
-        emit Mint(mintedAmount);
-
         //set renBTC to actual minted amount in case the user sent less BTC to Ren
-        uint256[2] memory receivedAmounts = amounts;
+        uint256[2] memory receivedAmounts = _amounts;
         receivedAmounts[0] = mintedAmount;
-        uint256 calc_token_amount = exchange.calc_token_amount(amounts, true);
-        if(calc_token_amount >= new_min_mint_amount) {
+        uint256 calc_token_amount = exchange.calc_token_amount(_amounts, true);
+        if(calc_token_amount >= _new_min_mint_amount) {
             require(WBTC.transferFrom(msg.sender, address(this), receivedAmounts[1]));
             uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
             exchange.add_liquidity(receivedAmounts, 0);
             uint256 curveBalanceAfter = curveToken.balanceOf(address(this));
             uint256 curveAmount = curveBalanceAfter.sub(curveBalanceBefore);
-            require(curveAmount >= new_min_mint_amount);
+            require(curveAmount >= _new_min_mint_amount);
             require(curveToken.transfer(msg.sender, curveAmount));
+            emit DepositMintedCurve(mintedAmount, curveAmount);
         }
         else {
             require(RENBTC.transfer(_wbtcDestination, mintedAmount));
+            emit ReceiveRen(mintedAmount);
         }
+    }
+
+    function mintNoSwap(
+        uint256 _minExchangeRate,
+        uint256 _newMinExchangeRate,
+        uint256 _slippage,
+        address payable _wbtcDestination,
+        uint256 _amount,
+        bytes32 _nHash,
+        bytes calldata _sig
+    ) external {
+        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _wbtcDestination, _msgSender()));
+        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+        
+        require(RENBTC.transfer(_wbtcDestination, mintedAmount));
+        emit ReceiveRen(mintedAmount);
+    }
+
+    function mintNoDeposit(
+        address payable _wbtcDestination, 
+        uint256 _amount, 
+        uint256[2] calldata _amounts, 
+        uint256 _min_mint_amount, 
+        uint256 _new_min_mint_amount, 
+        bytes32 _nHash, 
+        bytes calldata _sig
+    ) external {
+         // Mint renBTC tokens
+        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, _amounts, _min_mint_amount, _msgSender()));
+        //use actual _amount the user sent
+        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+
+        require(RENBTC.transfer(_wbtcDestination, mintedAmount));
+        emit ReceiveRen(mintedAmount);
     }
 
     function removeLiquidityThenBurn(bytes calldata _btcDestination, uint256 amount, uint256[2] calldata min_amounts) external {

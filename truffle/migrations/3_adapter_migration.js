@@ -1,5 +1,5 @@
 const Token = artifacts.require("Token");
-const CurveExchangeAdapter = artifacts.require("CurveExchangeAdapter");
+const CurveExchangeAdapter = artifacts.require("CurveExchangeAdapterMocks");
 
 module.exports = async function(deployer, network, accounts) {
 	curve = '0x93054188d876f558f4a66B2EF1d97d16eDf0895B'
