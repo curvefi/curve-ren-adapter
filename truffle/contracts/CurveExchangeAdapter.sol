@@ -738,14 +738,13 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 _minExchangeRate,
         uint256 _newMinExchangeRate,
         uint256 slippage,
-        bytes32 secret,
         address payable _wbtcDestination,
         uint256 _amount,
         bytes32 _nHash,
         bytes calldata _sig
     ) external {
         // Mint renBTC tokens
-        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, slippage, _wbtcDestination, keccak256(abi.encode(secret))));
+        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, slippage, _wbtcDestination, _msgSender()));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
 
         emit Mint(mintedAmount);
@@ -778,11 +777,10 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256[2] calldata amounts, 
         uint256 min_mint_amount, 
         uint256 new_min_mint_amount, 
-        bytes32 secret,
         bytes32 _nHash, 
         bytes calldata _sig) external {
         // Mint renBTC tokens
-        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, amounts, min_mint_amount, keccak256(abi.encode(secret))));
+        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, amounts, min_mint_amount, _msgSender()));
         //use actual _amount the user sent
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
 
