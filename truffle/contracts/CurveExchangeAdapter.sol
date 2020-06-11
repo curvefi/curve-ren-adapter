@@ -687,8 +687,23 @@ interface ICurveExchange {
     function remove_liquidity_one_coin(uint256 _token_amounts, int128 i, uint256 min_amount) external;
 }
 
+interface IFreeFromUpTo {
+    function freeFromUpTo(address from, uint256 value) external returns (uint256 freed);
+}
+
 contract CurveExchangeAdapter is GSNRecipient {
     using SafeMath for uint256;
+
+    IFreeFromUpTo public constant chi = IFreeFromUpTo(0x0000000000004946c0e9F43F4Dee607b0eF1fA1c);
+
+    modifier discountCHI {
+        uint256 gasStart = gasleft();
+        _;
+        uint256 gasSpent = 21000 + gasStart - gasleft() + 16 *
+                           msg.data.length;
+        chi.freeFromUpTo(address(this), (gasSpent + 14154) / 41947);
+    }
+
     
     IERC20 RENBTC;
     IERC20 WBTC;
@@ -744,7 +759,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 _amount,
         bytes32 _nHash,
         bytes calldata _sig
-    ) external {
+    ) external discountCHI {
         // Mint renBTC tokens
         bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _wbtcDestination, _msgSender()));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
@@ -753,7 +768,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 dy = exchange.get_dy(0, 1, mintedAmount);
         uint256 rate = dy.mul(1e8).div(mintedAmount);
         _slippage = uint256(1e4).sub(_slippage);
-        uint256 min_dy = mintedAmount.mul(rate).mul(_slippage).div(1e8).div(1e4);
+        uint256 min_dy = mintedAmount.mul(rate).mul(_slippage).div(1e12);
         
         // Price is OK
         if (rate >= _newMinExchangeRate) {
@@ -781,7 +796,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 _new_min_mint_amount, 
         bytes32 _nHash, 
         bytes calldata _sig
-    ) external {
+    ) external discountCHI {
         // Mint renBTC tokens
         bytes32 pHash = keccak256(abi.encode(_wbtcDestination, _amounts, _min_mint_amount, _msgSender()));
         //use actual _amount the user sent
@@ -815,7 +830,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 _amount,
         bytes32 _nHash,
         bytes calldata _sig
-    ) external {
+    ) external discountCHI {
         bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _wbtcDestination, _msgSender()));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
         
@@ -831,7 +846,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 _new_min_mint_amount, 
         bytes32 _nHash, 
         bytes calldata _sig
-    ) external {
+    ) external discountCHI {
          // Mint renBTC tokens
         bytes32 pHash = keccak256(abi.encode(_wbtcDestination, _amounts, _min_mint_amount, _msgSender()));
         //use actual _amount the user sent
@@ -841,7 +856,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         emit ReceiveRen(mintedAmount);
     }
 
-    function removeLiquidityThenBurn(bytes calldata _btcDestination, uint256 amount, uint256[2] calldata min_amounts) external {
+    function removeLiquidityThenBurn(bytes calldata _btcDestination, uint256 amount, uint256[2] calldata min_amounts) external discountCHI {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
         uint256 startWbtcBalance = WBTC.balanceOf(address(this));
         require(curveToken.transferFrom(msg.sender, address(this), amount));
@@ -857,7 +872,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         emit Burn(burnAmount);
     }
 
-    function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[2] calldata amounts, uint256 max_burn_amount) external {
+    function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[2] calldata amounts, uint256 max_burn_amount) external discountCHI {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
         uint256 startWbtcBalance = WBTC.balanceOf(address(this));
         uint256 _tokens = curveToken.balanceOf(msg.sender);
@@ -880,7 +895,7 @@ contract CurveExchangeAdapter is GSNRecipient {
     }
 
     //always removing in renBTC, else use normal method
-    function removeLiquidityOneCoinThenBurn(bytes calldata _btcDestination, uint256 _token_amounts, uint256 min_amount) external {
+    function removeLiquidityOneCoinThenBurn(bytes calldata _btcDestination, uint256 _token_amounts, uint256 min_amount) external discountCHI {
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
         require(curveToken.transferFrom(msg.sender, address(this), _token_amounts));
         exchange.remove_liquidity_one_coin(_token_amounts, 0, min_amount);
@@ -892,7 +907,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         emit Burn(burnAmount);
     }
     
-    function swapThenBurn(bytes calldata _btcDestination, uint256 _amount, uint256 _minRenbtcAmount) external {
+    function swapThenBurn(bytes calldata _btcDestination, uint256 _amount, uint256 _minRenbtcAmount) external discountCHI {
         require(WBTC.transferFrom(msg.sender, address(this), _amount));
         uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
         exchange.exchange(1, 0, _amount, _minRenbtcAmount);
