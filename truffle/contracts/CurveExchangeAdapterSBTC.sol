@@ -723,7 +723,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         exchange = _exchange;
         registry = _registry;
         curveToken = IERC20(_curveTokenAddress);
-        for(uint256 i = 0; i < 3; i++) {
+        for(uint256 i = 0; i < N_COINS; i++) {
             coins[i] = _coins[i];
             require(coins[i].approve(address(exchange), uint256(-1)));
         }        
@@ -813,11 +813,11 @@ contract CurveExchangeAdapter is GSNRecipient {
         //set renBTC to actual minted amount in case the user sent less BTC to Ren
         uint256[N_COINS] memory receivedAmounts = _amounts;
         receivedAmounts[0] = mintedAmount;
-        for(uint256 i = 1; i < 3; i++) {
+        for(uint256 i = 1; i < N_COINS; i++) {
             receivedAmounts[i] = _amounts[i];
         }
         if(exchange.calc_token_amount(_amounts, true) >= _new_min_mint_amount) {
-            for(uint256 i = 1; i < 3; i++) {
+            for(uint256 i = 1; i < N_COINS; i++) {
                 require(coins[i].transferFrom(msg.sender, address(this), receivedAmounts[i]));
             }
             uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
