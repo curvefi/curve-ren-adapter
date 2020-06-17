@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.6.2;
 
 import "./SafeMath.sol";
 
@@ -31,10 +31,6 @@ contract Token {
         totalSupply = _totalSupply;
         balances[msg.sender] = _totalSupply;
         emit Transfer(address(0), msg.sender, _totalSupply);
-    }
-
-    function () external payable {
-        revert();
     }
 
     function balanceOf(address _owner) external view returns (uint256) {
