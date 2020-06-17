@@ -769,13 +769,11 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
         
         // Get price
-        // compare if the exchange rate now * slippage in BPS is what user wanted
+        // compare if the exchange rate now * slippage in BPS is what user submitted as
         uint256 dy = exchange.get_dy(0, _j, mintedAmount);
         uint256 rate = dy.mul(1e8).div(precisions_normalized[uint256(_j)]).div(mintedAmount);
         _slippage = uint256(1e4).sub(_slippage);
-        uint256 min_dy = mintedAmount.mul(dy).mul(_slippage);
-        min_dy = min_dy.div(precisions_normalized[uint256(_j)]);
-        min_dy = min_dy.div(mintedAmount).div(1e12);
+        uint256 min_dy = dy.mul(_slippage).div(1e4);
         
         // Price is OK
         if (rate >= _newMinExchangeRate) {

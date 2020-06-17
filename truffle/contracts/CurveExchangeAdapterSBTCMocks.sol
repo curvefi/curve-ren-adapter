@@ -719,9 +719,10 @@ contract CurveExchangeAdapterSBTCMocks is GSNRecipient {
         chi.freeFromUpTo(address(this), (gasSpent + 14154) / 41947);
     }
 
+    uint256 constant N_COINS = 3;
     
-    IERC20[3] coins;
-    uint256[3] precisions_normalized = [1,1,1e10];
+    IERC20[N_COINS] coins;
+    uint256[N_COINS] precisions_normalized = [1,1,1e10];
 
     IToken token;
     IERC20 curveToken;
@@ -730,16 +731,16 @@ contract CurveExchangeAdapterSBTCMocks is GSNRecipient {
     IGatewayRegistry public registry;
 
     event SwapReceived(uint256 mintedAmount, uint256 wbtcAmount, int128 j);
-    event DepositMintedCurve(uint256 mintedAmount, uint256 curveAmount, uint256[3] amounts);
+    event DepositMintedCurve(uint256 mintedAmount, uint256 curveAmount, uint256[N_COINS] amounts);
     event ReceiveRen(uint256 renAmount);
     event Burn(uint256 burnAmount);
 
-    constructor(ICurveExchange _exchange, address _curveTokenAddress, IGatewayRegistry _registry, IERC20[3] memory _coins, IToken _token) public {
+    constructor(ICurveExchange _exchange, address _curveTokenAddress, IGatewayRegistry _registry, IERC20[N_COINS] memory _coins, IToken _token) public {
         exchange = _exchange;
         registry = _registry;
         curveToken = IERC20(_curveTokenAddress);
         token = _token;
-        for(uint256 i = 0; i < 3; i++) {
+        for(uint256 i = 0; i < N_COINS; i++) {
             coins[i] = _coins[i];
             require(coins[i].approve(address(exchange), uint256(-1)));
         }        
@@ -788,7 +789,7 @@ contract CurveExchangeAdapterSBTCMocks is GSNRecipient {
         dy = dy.div(precisions_normalized[uint256(_j)]);
         uint256 rate = dy.mul(1e8).div(mintedAmount);
         _slippage = uint256(1e4).sub(_slippage);
-        uint256 min_dy = mintedAmount.mul(rate).mul(_slippage).div(1e12);
+        uint256 min_dy = dy.mul(_slippage).div(1e4);
         
         // Price is OK
         if (rate >= _newMinExchangeRate) {
@@ -815,7 +816,7 @@ contract CurveExchangeAdapterSBTCMocks is GSNRecipient {
     function mintThenDeposit(
         address payable _wbtcDestination, 
         uint256 _amount, 
-        uint256[3] calldata _amounts, 
+        uint256[N_COINS] calldata _amounts, 
         uint256 _min_mint_amount, 
         uint256 _new_min_mint_amount, 
         bytes32 _nHash, 
@@ -827,13 +828,13 @@ contract CurveExchangeAdapterSBTCMocks is GSNRecipient {
         uint256 mintedAmount = token.mint(pHash, _amount, _nHash, _sig);
 
         //set renBTC to actual minted amount in case the user sent less BTC to Ren
-        uint256[3] memory receivedAmounts = _amounts;
+        uint256[N_COINS] memory receivedAmounts = _amounts;
         receivedAmounts[0] = mintedAmount;
-        for(uint256 i = 1; i < 3; i++) {
+        for(uint256 i = 1; i < N_COINS; i++) {
             receivedAmounts[i] = _amounts[i];
         }
         if(exchange.calc_token_amount(_amounts, true) >= _new_min_mint_amount) {
-            for(uint256 i = 1; i < 3; i++) {
+            for(uint256 i = 1; i < N_COINS; i++) {
                 require(coins[i].transferFrom(msg.sender, address(this), receivedAmounts[i]));
             }
             uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
@@ -869,7 +870,7 @@ contract CurveExchangeAdapterSBTCMocks is GSNRecipient {
     function mintNoDeposit(
         address payable _wbtcDestination, 
         uint256 _amount, 
-        uint256[3] calldata _amounts, 
+        uint256[N_COINS] calldata _amounts, 
         uint256 _min_mint_amount, 
         uint256 _new_min_mint_amount, 
         bytes32 _nHash, 
@@ -884,8 +885,8 @@ contract CurveExchangeAdapterSBTCMocks is GSNRecipient {
         emit ReceiveRen(mintedAmount);
     }
 
-    function removeLiquidityThenBurn(bytes calldata _btcDestination, uint256 amount, uint256[3] calldata min_amounts) external discountCHI {
-        uint256[3] memory balances;
+    function removeLiquidityThenBurn(bytes calldata _btcDestination, uint256 amount, uint256[N_COINS] calldata min_amounts) external discountCHI {
+        uint256[N_COINS] memory balances;
         for(uint256 i = 0; i < coins.length; i++) {
             balances[i] = coins[i].balanceOf(address(this));
         }
@@ -904,8 +905,8 @@ contract CurveExchangeAdapterSBTCMocks is GSNRecipient {
         emit Burn(burnAmount);
     }
 
-    function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[3] calldata amounts, uint256 max_burn_amount) external discountCHI {
-        uint256[3] memory balances;
+    function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[N_COINS] calldata amounts, uint256 max_burn_amount) external discountCHI {
+        uint256[N_COINS] memory balances;
         for(uint256 i = 0; i < coins.length; i++) {
             balances[i] = coins[i].balanceOf(address(this));
         }
