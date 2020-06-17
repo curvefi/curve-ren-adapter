@@ -706,6 +706,7 @@ contract CurveExchangeAdapter is GSNRecipient {
 
     uint256 constant N_COINS = 3;
     
+    //first coin always is renBTC
     IERC20[N_COINS] coins;
     uint256[N_COINS] precisions_normalized = [1,1,1e10];
 
@@ -768,11 +769,13 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
         
         // Get price
+        // compare if the exchange rate now * slippage in BPS is what user wanted
         uint256 dy = exchange.get_dy(0, _j, mintedAmount);
-        dy = dy.div(precisions_normalized[uint256(_j)]);
-        uint256 rate = dy.mul(1e8).div(mintedAmount);
+        uint256 rate = dy.mul(1e8).div(precisions_normalized[uint256(_j)]).div(mintedAmount);
         _slippage = uint256(1e4).sub(_slippage);
-        uint256 min_dy = mintedAmount.mul(rate).mul(_slippage).div(1e12);
+        uint256 min_dy = mintedAmount.mul(dy).mul(_slippage);
+        min_dy = min_dy.div(precisions_normalized[uint256(_j)]);
+        min_dy = min_dy.div(mintedAmount).div(1e12);
         
         // Price is OK
         if (rate >= _newMinExchangeRate) {
