@@ -138,14 +138,24 @@ contract('Curve Protocol', async accounts => {
 		min_receive_amount = BN(mintedAmount).times(exchange_rate).times(BN(0.99))
 		sbtcReceived.should.be.bignumber.at.least(min_receive_amount)
 
-		//make it fail and check renBTC balance
 		let renBalance = BN(await renContract.methods.balanceOf(account).call())
 		min_amount = BN(min_amount).times(100).toFixed(0,1)
 		min_exchange_rate = BN(min_exchange_rate).times(100).toFixed(0,1)
-		let receipt2 = await contract.mintThenSwap(min_exchange_rate, min_exchange_rate, 100, 2, account, amount, "0x30", "0x30", { from: account })
+		let receipt2 = await contract.mintThenSwap(min_exchange_rate, min_exchange_rate, 100, 1, account, amount, "0x30", "0x30", { from: account })
 		let endRenBalance = BN(await renContract.methods.balanceOf(account).call())
 		//mock mint is always 10000
 		let renReceived = endRenBalance.minus(renBalance)
+		mintedAmount = receipt2.logs[0].args.renAmount
+		renReceived.should.be.bignumber.equal(BN(mintedAmount))
+
+		//make it fail and check renBTC balance
+		renBalance = BN(await renContract.methods.balanceOf(account).call())
+		min_amount = BN(min_amount).times(100).toFixed(0,1)
+		min_exchange_rate = BN(min_exchange_rate).times(100).toFixed(0,1)
+		receipt2 = await contract.mintThenSwap(min_exchange_rate, min_exchange_rate, 100, 2, account, amount, "0x30", "0x30", { from: account })
+		endRenBalance = BN(await renContract.methods.balanceOf(account).call())
+		//mock mint is always 10000
+		renReceived = endRenBalance.minus(renBalance)
 		mintedAmount = receipt2.logs[0].args.renAmount
 		renReceived.should.be.bignumber.equal(BN(mintedAmount))
 	});
@@ -167,7 +177,7 @@ contract('Curve Protocol', async accounts => {
 		let account = accounts[0]
 		let contract = await CurveAdapter.deployed()
 		let renBalance = BN(await renContract.methods.balanceOf(account).call())
-		let receipt = await contract.mintNoDeposit(account, 0, [0,0], 0, 0, "0x30", "0x30", { from: account })
+		let receipt = await contract.mintNoDeposit(account, 0, [0,0,0], 0, 0, "0x30", "0x30", { from: account })
 		let endRenBalance = BN(await renContract.methods.balanceOf(account).call())
 
 		let renReceived = endRenBalance.minus(renBalance)
@@ -179,25 +189,34 @@ contract('Curve Protocol', async accounts => {
 		let account = accounts[0]
 		let contract = await CurveAdapter.deployed()
 
-		let amounts = ["10000", "10000", "10000"]
-
-		let calc_token_amount =  BN(await swapContract.methods.calc_token_amount(amounts, true).call())
-		let min_mint_amount = calc_token_amount.times(BN(0.99))
-
 		let amount = BN(1e4).toFixed(0,1);
+		
+		let allAmounts = [
+			["10000", "10000", "10000"],
+			["10000", "10000", "0"],
+			["10000", "0", "0"],
+		]
 
-		let curveBalance = BN(await swapTokenContract.methods.balanceOf(account).call())
-		let receipt = await contract.mintThenDeposit(account, amount, amounts, min_mint_amount.toFixed(0,1), min_mint_amount.toFixed(0,1), "0x30", "0x30", { from: account })
-		let endCurveBalance = BN(await swapTokenContract.methods.balanceOf(account).call())
-		let curveReceived = endCurveBalance.minus(curveBalance)
-		amounts[0] = BN(receipt.logs[0].args.mintedAmount).toFixed(0,1)
-		let new_min_mint_amount = BN(await swapContract.methods.calc_token_amount(amounts, true).call()).times(BN(0.99))
-		curveReceived.should.be.bignumber.at.least(new_min_mint_amount)
+		for(let amounts of allAmounts) {
+
+			let calc_token_amount =  BN(await swapContract.methods.calc_token_amount(amounts, true).call())
+			let min_mint_amount = calc_token_amount.times(BN(0.99))
+
+
+			let curveBalance = BN(await swapTokenContract.methods.balanceOf(account).call())
+			let receipt = await contract.mintThenDeposit(account, amount, amounts, min_mint_amount.toFixed(0,1), min_mint_amount.toFixed(0,1), "0x30", "0x30", { from: account })
+			let endCurveBalance = BN(await swapTokenContract.methods.balanceOf(account).call())
+			let curveReceived = endCurveBalance.minus(curveBalance)
+			amounts[0] = BN(receipt.logs[0].args.mintedAmount).toFixed(0,1)
+			let new_min_mint_amount = BN(await swapContract.methods.calc_token_amount(amounts, true).call()).times(BN(0.99))
+			curveReceived.should.be.bignumber.at.least(new_min_mint_amount)
+		}
+
 
 
 		//make it fail with a larger min mint amount
 		let renBalance = BN(await renContract.methods.balanceOf(account).call())
-		let receipt2 = await contract.mintThenDeposit(account, amount, amounts, "1099864718376454", "1099864718376454", "0x30", "0x30", { from: account })
+		let receipt2 = await contract.mintThenDeposit(account, amount, allAmounts[0], "1099864718376454", "1099864718376454", "0x30", "0x30", { from: account })
 		let endRenBalance = BN(await renContract.methods.balanceOf(account).call())
 		let renReceived = endRenBalance.minus(renBalance)
 		let mintedAmount = receipt2.logs[0].args.renAmount
@@ -232,14 +251,16 @@ contract('Curve Protocol', async accounts => {
 
 		let balance = await swapTokenContract.methods.balanceOf(account).call()
 		let wbtcBalance = BN(await wbtcContract.methods.balanceOf(account).call())
+		let sbtcBalance = BN(await sbtcContract.methods.balanceOf(account).call())
 		let renBalance = BN(await renContract.methods.balanceOf(account).call())
 		await swapTokenContract.methods.approve(contract.address, balance).send({from: account, gasLimit: 1000000 })
 
 		let receipt = await contract.removeLiquidityImbalanceThenBurn('0x30', [1000,1000,1000], BN(balance).div(2).toFixed(0,1))
+		let endsbtcBalance = BN(await sbtcContract.methods.balanceOf(account).call())
 		let endwbtcBalance = BN(await wbtcContract.methods.balanceOf(account).call())
 		let endrenBalance = BN(await renContract.methods.balanceOf(account).call())
 
-
+		let sbtcWithdrawn = endsbtcBalance.minus(sbtcBalance)
 		let wbtcWithdrawn = endwbtcBalance.minus(wbtcBalance)
 		let renWithdrawn = endrenBalance.minus(renBalance)
 

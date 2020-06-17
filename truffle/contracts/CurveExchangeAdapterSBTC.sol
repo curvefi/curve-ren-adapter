@@ -784,6 +784,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         
         // Price is OK
         if (rate >= _newMinExchangeRate) {
+            require(_j != 0);
             doSwap(_j, mintedAmount, min_dy, _coinDestination);
         } else {
             //Send renBTC to the User instead
@@ -821,8 +822,12 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256[3] memory receivedAmounts = _amounts;
         receivedAmounts[0] = mintedAmount;
         if(exchange.calc_token_amount(_amounts, true) >= _new_min_mint_amount) {
-            require(WBTC.transferFrom(msg.sender, address(this), receivedAmounts[1]));
-            require(SBTC.transferFrom(msg.sender, address(this), receivedAmounts[2]));
+            if(receivedAmounts[1] > 0) {
+                require(WBTC.transferFrom(msg.sender, address(this), receivedAmounts[1]));
+            }
+            if(receivedAmounts[2] > 0) {
+                require(SBTC.transferFrom(msg.sender, address(this), receivedAmounts[2]));
+            }
             uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
             exchange.add_liquidity(receivedAmounts, 0);
             uint256 curveBalanceAfter = curveToken.balanceOf(address(this));
