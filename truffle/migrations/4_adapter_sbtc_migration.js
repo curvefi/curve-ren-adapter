@@ -7,7 +7,8 @@ module.exports = async function(deployer, network, accounts) {
 	registry = '0xe80d347df1209a76dd9d2319d62912ba98c54ddd'
 	wbtc = '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'
 	sbtc = '0xfE18be6b3Bd88A2D2A7f928d00292E7a9963CfC6'
+	renbtc = '0xEB4C2781e4ebA804CE9a9803C67d0893436bB27D'
 	console.log(curve, curve_token, registry, wbtc, sbtc, accounts[0], Token.address)
 
-	deployer.deploy(CurveExchangeAdapter, curve, curve_token, registry, wbtc, sbtc, Token.address);
+	deployer.deploy(CurveExchangeAdapter, curve, curve_token, registry, [renbtc, wbtc, sbtc], Token.address);
 };

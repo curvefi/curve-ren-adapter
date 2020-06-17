@@ -705,10 +705,8 @@ contract CurveExchangeAdapter is GSNRecipient {
     }
 
     
-    IERC20 RENBTC;
-    IERC20 WBTC;
-    IERC20 SBTC;
-    mapping(int128 => IERC20) coins;
+    IERC20[3] coins;
+    uint256[3] precisions_normalized = [1,1,1e10];
 
     IERC20 curveToken;
 
@@ -720,22 +718,14 @@ contract CurveExchangeAdapter is GSNRecipient {
     event ReceiveRen(uint256 renAmount);
     event Burn(uint256 burnAmount);
 
-    constructor(ICurveExchange _exchange, address _curveTokenAddress, IGatewayRegistry _registry, IERC20 _wbtc, IERC20 _sbtc) public {
+    constructor(ICurveExchange _exchange, address _curveTokenAddress, IGatewayRegistry _registry, IERC20[3] memory _coins) public {
         exchange = _exchange;
         registry = _registry;
-        RENBTC = registry.getTokenBySymbol("BTC");
-        WBTC = _wbtc;
-        SBTC = _sbtc;
         curveToken = IERC20(_curveTokenAddress);
-        
-        coins[0] = RENBTC;
-        coins[1] = WBTC;
-        coins[2] = SBTC;
-        
-        // Approve exchange.
-        require(RENBTC.approve(address(exchange), uint256(-1)));
-        require(WBTC.approve(address(exchange), uint256(-1)));
-        require(SBTC.approve(address(exchange), uint256(-1)));
+        for(uint256 i = 0; i < 3; i++) {
+            coins[i] = _coins[i];
+            require(coins[i].approve(address(exchange), uint256(-1)));
+        }        
     }
     
     // GSN Support
@@ -778,6 +768,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         
         // Get price
         uint256 dy = exchange.get_dy(0, _j, mintedAmount);
+        dy = dy.div(precisions_normalized[uint256(_j)]);
         uint256 rate = dy.mul(1e8).div(mintedAmount);
         _slippage = uint256(1e4).sub(_slippage);
         uint256 min_dy = mintedAmount.mul(rate).mul(_slippage).div(1e12);
@@ -788,19 +779,19 @@ contract CurveExchangeAdapter is GSNRecipient {
             doSwap(_j, mintedAmount, min_dy, _coinDestination);
         } else {
             //Send renBTC to the User instead
-            require(RENBTC.transfer(_coinDestination, mintedAmount));
+            require(coins[0].transfer(_coinDestination, mintedAmount));
             emit ReceiveRen(mintedAmount);
         }
     }
 
     function doSwap(int128 _j, uint256 _mintedAmount, uint256 _min_dy, address payable _coinDestination) internal {
-        uint256 startBalance = coins[_j].balanceOf(address(this));
+        uint256 startBalance = coins[uint256(_j)].balanceOf(address(this));
         exchange.exchange(0, _j, _mintedAmount, _min_dy);
-        uint256 endBalance = coins[_j].balanceOf(address(this));
+        uint256 endBalance = coins[uint256(_j)].balanceOf(address(this));
         uint256 bought = endBalance.sub(startBalance);
     
         //Send proceeds to the User
-        require(coins[_j].transfer(_coinDestination, bought));
+        require(coins[uint256(_j)].transfer(_coinDestination, bought));
         emit SwapReceived(_mintedAmount, bought, _j);
     }
 
@@ -821,12 +812,12 @@ contract CurveExchangeAdapter is GSNRecipient {
         //set renBTC to actual minted amount in case the user sent less BTC to Ren
         uint256[3] memory receivedAmounts = _amounts;
         receivedAmounts[0] = mintedAmount;
+        for(uint256 i = 1; i < 3; i++) {
+            receivedAmounts[i] = _amounts[i];
+        }
         if(exchange.calc_token_amount(_amounts, true) >= _new_min_mint_amount) {
-            if(receivedAmounts[1] > 0) {
-                require(WBTC.transferFrom(msg.sender, address(this), receivedAmounts[1]));
-            }
-            if(receivedAmounts[2] > 0) {
-                require(SBTC.transferFrom(msg.sender, address(this), receivedAmounts[2]));
+            for(uint256 i = 1; i < 3; i++) {
+                require(coins[i].transferFrom(msg.sender, address(this), receivedAmounts[i]));
             }
             uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
             exchange.add_liquidity(receivedAmounts, 0);
@@ -837,7 +828,7 @@ contract CurveExchangeAdapter is GSNRecipient {
             emit DepositMintedCurve(mintedAmount, curveAmount, _amounts);
         }
         else {
-            require(RENBTC.transfer(_wbtcDestination, mintedAmount));
+            require(coins[0].transfer(_wbtcDestination, mintedAmount));
             emit ReceiveRen(mintedAmount);
         }
     }
@@ -854,7 +845,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _wbtcDestination, _msgSender()));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
         
-        require(RENBTC.transfer(_wbtcDestination, mintedAmount));
+        require(coins[0].transfer(_wbtcDestination, mintedAmount));
         emit ReceiveRen(mintedAmount);
     }
 
@@ -872,24 +863,24 @@ contract CurveExchangeAdapter is GSNRecipient {
         //use actual _amount the user sent
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
 
-        require(RENBTC.transfer(_wbtcDestination, mintedAmount));
+        require(coins[0].transfer(_wbtcDestination, mintedAmount));
         emit ReceiveRen(mintedAmount);
     }
 
     function removeLiquidityThenBurn(bytes calldata _btcDestination, uint256 amount, uint256[3] calldata min_amounts) external discountCHI {
         uint256[3] memory balances;
-        balances[0] = RENBTC.balanceOf(address(this));
-        balances[1] = WBTC.balanceOf(address(this));
-        balances[2] = SBTC.balanceOf(address(this));
+        for(uint256 i = 0; i < coins.length; i++) {
+            balances[i] = coins[i].balanceOf(address(this));
+        }
 
         require(curveToken.transferFrom(msg.sender, address(this), amount));
         exchange.remove_liquidity(amount, min_amounts);
 
-        balances[0] = RENBTC.balanceOf(address(this)).sub(balances[0]);
-        balances[1] = WBTC.balanceOf(address(this)).sub(balances[1]);
-        balances[2] = SBTC.balanceOf(address(this)).sub(balances[2]);
-        require(WBTC.transfer(msg.sender, balances[1]));
-        require(SBTC.transfer(msg.sender, balances[2]));
+        for(uint256 i = 0; i < coins.length; i++) {
+            balances[i] = coins[i].balanceOf(address(this)).sub(balances[i]);
+            if(i == 0) continue;
+            require(coins[i].transfer(msg.sender, balances[i]));
+        }
 
         // Burn and send proceeds to the User
         uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, balances[0]);
@@ -898,10 +889,9 @@ contract CurveExchangeAdapter is GSNRecipient {
 
     function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, uint256[3] calldata amounts, uint256 max_burn_amount) external discountCHI {
         uint256[3] memory balances;
-        uint256[3] memory endBalances;
-        balances[0] = RENBTC.balanceOf(address(this));
-        balances[1] = WBTC.balanceOf(address(this));
-        balances[2] = SBTC.balanceOf(address(this));
+        for(uint256 i = 0; i < coins.length; i++) {
+            balances[i] = coins[i].balanceOf(address(this));
+        }
 
         uint256 _tokens = curveToken.balanceOf(msg.sender);
         if(_tokens > max_burn_amount) { 
@@ -912,11 +902,11 @@ contract CurveExchangeAdapter is GSNRecipient {
         _tokens = curveToken.balanceOf(address(this));
         require(curveToken.transfer(msg.sender, _tokens));
 
-        balances[0] = RENBTC.balanceOf(address(this)).sub(balances[0]);
-        balances[1] = WBTC.balanceOf(address(this)).sub(balances[1]);
-        balances[2] = SBTC.balanceOf(address(this)).sub(balances[2]);
-        require(WBTC.transfer(msg.sender, balances[1]));
-        require(SBTC.transfer(msg.sender, balances[2]));
+        for(uint256 i = 0; i < coins.length; i++) {
+            balances[i] = coins[i].balanceOf(address(this)).sub(balances[i]);
+            if(i == 0) continue;
+            require(coins[i].transfer(msg.sender, balances[i]));
+        }
 
         // Burn and send proceeds to the User
         uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, balances[0]);
@@ -925,10 +915,10 @@ contract CurveExchangeAdapter is GSNRecipient {
 
     //always removing in renBTC, else use normal method
     function removeLiquidityOneCoinThenBurn(bytes calldata _btcDestination, uint256 _token_amounts, uint256 min_amount, uint8 _i) external discountCHI {
-        uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
+        uint256 startRenbtcBalance = coins[0].balanceOf(address(this));
         require(curveToken.transferFrom(msg.sender, address(this), _token_amounts));
         exchange.remove_liquidity_one_coin(_token_amounts, _i, min_amount);
-        uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
+        uint256 endRenbtcBalance = coins[0].balanceOf(address(this));
         uint256 renbtcWithdrawn = endRenbtcBalance.sub(startRenbtcBalance);
 
         // Burn and send proceeds to the User
@@ -938,9 +928,9 @@ contract CurveExchangeAdapter is GSNRecipient {
     
     function swapThenBurn(bytes calldata _btcDestination, uint256 _amount, uint256 _minRenbtcAmount, uint8 _i) external discountCHI {
         require(coins[_i].transferFrom(msg.sender, address(this), _amount));
-        uint256 startRenbtcBalance = RENBTC.balanceOf(address(this));
+        uint256 startRenbtcBalance = coins[0].balanceOf(address(this));
         exchange.exchange(_i, 0, _amount, _minRenbtcAmount);
-        uint256 endRenbtcBalance = RENBTC.balanceOf(address(this));
+        uint256 endRenbtcBalance = coins[0].balanceOf(address(this));
         uint256 renbtcBought = endRenbtcBalance.sub(startRenbtcBalance);
         
         // Burn and send proceeds to the User
