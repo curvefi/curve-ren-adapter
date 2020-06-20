@@ -689,6 +689,8 @@ interface ICurveExchange {
 
 interface IFreeFromUpTo {
     function freeFromUpTo(address from, uint256 value) external returns (uint256 freed);
+    function balanceOf(address account) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
 }
 
 contract CurveExchangeAdapter is GSNRecipient {
@@ -701,7 +703,12 @@ contract CurveExchangeAdapter is GSNRecipient {
         _;
         uint256 gasSpent = 21000 + gasStart - gasleft() + 16 *
                            msg.data.length;
-        chi.freeFromUpTo(address(this), (gasSpent + 14154) / 41947);
+        if(chi.balanceOf(address(this)) > 0) {
+            chi.freeFromUpTo(address(this), (gasSpent + 14154) / 41947);
+        }
+        else {
+            chi.freeFromUpTo(_msgSender(), (gasSpent + 14154) / 41947);
+        }
     }
 
     
@@ -728,6 +735,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         // Approve exchange.
         require(RENBTC.approve(address(exchange), uint256(-1)));
         require(WBTC.approve(address(exchange), uint256(-1)));
+        require(chi.approve(address(this), uint256(-1)));
     }
     
     // GSN Support
