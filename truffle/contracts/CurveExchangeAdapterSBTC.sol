@@ -836,7 +836,9 @@ contract CurveExchangeAdapter is GSNRecipient {
 
     function doDeposit(uint256[N_COINS] memory receivedAmounts, uint256 mintedAmount, uint256 _new_min_mint_amount, address _wbtcDestination) internal {
         for(uint256 i = 1; i < N_COINS; i++) {
-            require(coins[i].transferFrom(_msgSender(), address(this), receivedAmounts[i]));
+            if(receivedAmounts[i] > 0) {
+                require(coins[i].transferFrom(_msgSender(), address(this), receivedAmounts[i]));
+            }
         }
         uint256 curveBalanceBefore = curveToken.balanceOf(address(this));
         exchange.add_liquidity(receivedAmounts, 0);
