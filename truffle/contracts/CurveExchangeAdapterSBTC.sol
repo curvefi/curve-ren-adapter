@@ -737,6 +737,16 @@ contract CurveExchangeAdapter is GSNRecipient {
         }
         require(chi.approve(address(this), uint256(-1)));
     }
+
+    function recoverStuck(
+    	bytes32 pHash,
+    	uint256 _amount,
+        bytes32 _nHash,
+        bytes calldata _sig
+    ) external {
+    	uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+    	require(coins[0].transfer(_msgSender(), mintedAmount));
+    }
     
     // GSN Support
     function acceptRelayedCall(
