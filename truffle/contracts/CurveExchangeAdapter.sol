@@ -144,7 +144,7 @@ contract CurveExchangeAdapter {
         uint256 _amount,
         bytes32 _nHash,
         bytes calldata _sig
-    ) external discountCHI {
+    ) external {
         uint256 start = encoded.length - 32;
         address sender = abi.decode(encoded[start:], (address));
         require(sender == msg.sender);
