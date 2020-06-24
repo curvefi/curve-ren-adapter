@@ -738,14 +738,46 @@ contract CurveExchangeAdapter is GSNRecipient {
         require(chi.approve(address(this), uint256(-1)));
     }
 
-    function recoverStuck(
-    	bytes32 pHash,
-    	uint256 _amount,
+    function recoverStuckSwap(
+        bytes calldata encoded,
+        uint256 _amount,
         bytes32 _nHash,
         bytes calldata _sig
     ) external {
-    	uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
-    	require(coins[0].transfer(_msgSender(), mintedAmount));
+        address sender;
+        (,,,,sender) = abi.decode(encoded, (uint256, uint256, int128, address, address));
+        require(sender == _msgSender());
+        bytes32 pHash = keccak256(encoded);
+        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+        require(coins[0].transfer(_msgSender(), mintedAmount));
+    }
+
+    function recoverStuckDeposit(
+        bytes calldata encoded,
+        uint256 _amount,
+        bytes32 _nHash,
+        bytes calldata _sig
+    ) external {
+        address sender;
+        (,,,sender) = abi.decode(encoded, (address, uint256[2], uint256, address));
+        require(sender == _msgSender());
+        bytes32 pHash = keccak256(encoded);
+        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+        require(coins[0].transfer(_msgSender(), mintedAmount));
+    }
+
+    function recoverStuckDeposit3(
+        bytes calldata encoded,
+        uint256 _amount,
+        bytes32 _nHash,
+        bytes calldata _sig
+    ) external {
+        address sender;
+        (,,,sender) = abi.decode(encoded, (address, uint256[3], uint256, address));
+        require(sender == _msgSender());
+        bytes32 pHash = keccak256(encoded);
+        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+        require(coins[0].transfer(_msgSender(), mintedAmount));
     }
     
     // GSN Support
