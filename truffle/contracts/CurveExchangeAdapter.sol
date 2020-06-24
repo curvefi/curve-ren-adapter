@@ -830,6 +830,24 @@ contract CurveExchangeAdapter is GSNRecipient {
         }
     }
 
+    function mintNoDepositRecover(
+        address payable _wbtcDestination, 
+        uint256 _amount, 
+        uint256[3] calldata _amounts, 
+        uint256 _min_mint_amount, 
+        uint256 _new_min_mint_amount, 
+        bytes32 _nHash, 
+        bytes calldata _sig
+    ) external discountCHI {
+         // Mint renBTC tokens
+        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, _amounts, _min_mint_amount, _msgSender()));
+        //use actual _amount the user sent
+        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+
+        require(RENBTC.transfer(_wbtcDestination, mintedAmount));
+        emit ReceiveRen(mintedAmount);
+    }
+
     function mintNoSwap(
         uint256 _minExchangeRate,
         uint256 _newMinExchangeRate,
@@ -840,6 +858,23 @@ contract CurveExchangeAdapter is GSNRecipient {
         bytes calldata _sig
     ) external discountCHI {
         bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _wbtcDestination, _msgSender()));
+        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+        
+        require(RENBTC.transfer(_wbtcDestination, mintedAmount));
+        emit ReceiveRen(mintedAmount);
+    }
+
+    function mintNoSwapRecover(
+        uint256 _minExchangeRate,
+        uint256 _newMinExchangeRate,
+        uint256 _slippage,
+        int128 _j,
+        address payable _wbtcDestination,
+        uint256 _amount,
+        bytes32 _nHash,
+        bytes calldata _sig
+    ) external discountCHI {
+        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _j, __wbtcDestination, _msgSender()));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
         
         require(RENBTC.transfer(_wbtcDestination, mintedAmount));

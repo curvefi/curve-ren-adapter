@@ -834,6 +834,24 @@ contract CurveExchangeAdapter is GSNRecipient {
         }
     }
 
+    function mintNoDepositRecover(
+        address payable _wbtcDestination, 
+        uint256 _amount, 
+        uint256[2] calldata _amounts, 
+        uint256 _min_mint_amount, 
+        uint256 _new_min_mint_amount, 
+        bytes32 _nHash, 
+        bytes calldata _sig
+    ) external discountCHI {
+         // Mint renBTC tokens
+        bytes32 pHash = keccak256(abi.encode(_wbtcDestination, _amounts, _min_mint_amount, _msgSender()));
+        //use actual _amount the user sent
+        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+
+        require(coins[0].transfer(_wbtcDestination, mintedAmount));
+        emit ReceiveRen(mintedAmount);
+    }
+
     function doDeposit(uint256[N_COINS] memory receivedAmounts, uint256 mintedAmount, uint256 _new_min_mint_amount, address _wbtcDestination) internal {
         for(uint256 i = 1; i < N_COINS; i++) {
             if(receivedAmounts[i] > 0) {
@@ -853,6 +871,23 @@ contract CurveExchangeAdapter is GSNRecipient {
         uint256 _minExchangeRate,
         uint256 _newMinExchangeRate,
         uint256 _slippage,
+        int128 _j,
+        address payable _wbtcDestination,
+        uint256 _amount,
+        bytes32 _nHash,
+        bytes calldata _sig
+    ) external discountCHI {
+        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _j, __wbtcDestination, _msgSender()));
+        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
+        
+        require(coins[0].transfer(_wbtcDestination, mintedAmount));
+        emit ReceiveRen(mintedAmount);
+    }
+
+    function mintNoSwapRecover(
+        uint256 _minExchangeRate,
+        uint256 _newMinExchangeRate,
+        uint256 _slippage,
         address payable _wbtcDestination,
         uint256 _amount,
         bytes32 _nHash,
@@ -864,6 +899,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         require(coins[0].transfer(_wbtcDestination, mintedAmount));
         emit ReceiveRen(mintedAmount);
     }
+
 
     function mintNoDeposit(
         address payable _wbtcDestination, 
