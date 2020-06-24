@@ -170,7 +170,7 @@ contract CurveExchangeAdapter {
         uint256 dy = exchange.get_dy(0, 1, mintedAmount);
         uint256 rate = dy.mul(1e8).div(mintedAmount);
         _slippage = uint256(1e4).sub(_slippage);
-        uint256 min_dy = mintedAmount.mul(rate).mul(_slippage).div(1e12);
+        uint256 min_dy = dy.mul(_slippage).div(1e4);
         
         // Price is OK
         if (rate >= _newMinExchangeRate) {
