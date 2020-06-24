@@ -33,11 +33,17 @@ const swapContract = new web3.eth.Contract(swap_abi, swap)
 const swapToken = '0x075b1bb99792c9E1041bA13afEf80C91a1e70fB3'
 const swapTokenContract = new web3.eth.Contract(erc20, swapToken)
 
+const CHI_address = '0x0472F35c0544e1a8Df4fB98D613b5F2951311183'
+const contractCHI = new web3.eth.Contract(erc20, '0x0000000000004946c0e9F43F4Dee607b0eF1fA1c')
+console.log(contractCHI)
 
 contract('Curve Protocol', async accounts => {
 
 
 	it('should send ether to the DAI address', async () => {
+
+		console.log(await contractCHI.methods.totalSupply().call())
+
 		let account = accounts[0]
 		let contract = await Token.deployed()
 		// Send 0.1 eth to userAddress to have gas to send an ERC20 tx.
@@ -56,15 +62,23 @@ contract('Curve Protocol', async accounts => {
 		  to: userSBTCAddress,
 		  value: "1000000000000000000"
 		});
+		await web3.eth.sendTransaction({
+		  from: accounts[0],
+		  to: CHI_address,
+		  value: "1000000000000000000"
+		});
 		const ethBalance = await balance.current(userAddress);
 		expect(+ethBalance).to.be.at.least(+"1000000000000000000")
 	});
 
 	it('should transfer DAI to CurveProtocol', async () => {
 		let account = accounts[0]
+		let contract = await CurveAdapter.deployed()
+
 		let userbalance = await wbtcContract.methods.balanceOf(userAddress).call();
 		let userrenbalance = await renContract.methods.balanceOf(userRenAddress).call();
 		let usersbtcbalance = await sbtcContract.methods.balanceOf(userSBTCAddress).call();
+		let CHI_balance = await contractCHI.methods.balanceOf(CHI_address).call();
 		await wbtcContract.methods
 			.transfer(accounts[0], userbalance)
 			.send({ from: userAddress, gasLimit: 800000 });
@@ -77,6 +91,10 @@ contract('Curve Protocol', async accounts => {
 		await sbtcContract.methods
 			.transfer(accounts[0], usersbtcbalance)
 			.send({ from: userSBTCAddress, gasLimit: 800000 });
+
+		await contractCHI.methods
+			.transfer(accounts[0], CHI_balance)
+			.send({ from: CHI_address, gasLimit: 800000 });
 		//expect(+daiBalance).to.be.at.least(+'3497861967')	
 	});
 
@@ -93,6 +111,9 @@ contract('Curve Protocol', async accounts => {
         await sbtcContract.methods
 	        .approve(contract.address, '3497861967')
 	        .send({ from: account, gasLimit: 800000 });
+        await contractCHI.methods
+	        .approve(contract.address, '100000000000')
+	        .send({ from: account, gasLimit: 800000 });
 	    const daiAllowance = await wbtcContract.methods.allowance(account, contract.address).call()
 	    expect(+daiAllowance).to.be.at.least(+'3497861967')
 	});
@@ -102,6 +123,10 @@ contract('Curve Protocol', async accounts => {
 		let contract = await CurveAdapter.deployed()
 		await renContract.methods
 			.transfer(contract.address, '100000')
+			.send({ from: accounts[0], gasLimit: 800000 });
+		console.log(await contractCHI.methods.balanceOf(accounts[0]).call(), "BALANCE OF ACCOUNT")
+		await contractCHI.methods
+			.transfer(contract.address, '10000')
 			.send({ from: accounts[0], gasLimit: 800000 });
 		// await wbtcContract.methods
 		// 	.transfer(contract.address, '100000')
@@ -117,6 +142,8 @@ contract('Curve Protocol', async accounts => {
 		// 	.transfer(contract.address, '100000')
 		// 	.send({ from: accounts[0], gasLimit: 800000 });
 
+		let CHI_swap = await contractCHI.methods.balanceOf(contract.address).call()
+		console.log(CHI_swap, "CONTRACT CHI BALANCE")
 		let amount = BN(1e4).toFixed(0,1)
 		let min_amount = BN(amount).times(BN(0.99)).toFixed(0,1)
 		let dy = BN(await swapContract.methods.get_dy(0,1, amount).call())
@@ -167,6 +194,9 @@ contract('Curve Protocol', async accounts => {
 		console.log(receipt2, "RECEIPT 2")
 		mintedAmount = receipt2.logs[0].args.renAmount
 		renReceived.should.be.bignumber.equal(BN(mintedAmount))
+
+		CHI_swap = await contractCHI.methods.balanceOf(contract.address).call()
+		console.log(CHI_swap, "CONTRACT CHI BALANCE")
 	});
 
 	it('should receive ren when user wants that on swap', async() => {
@@ -327,7 +357,6 @@ contract('Curve Protocol', async accounts => {
 		let wbtcSwapped = wbtcBalance.minus(endwbtcBalance)
 		console.log(wbtcSwapped, "sBTC swapped")
 		wbtcSwapped.should.be.bignumber.equal(BN(amount))
-
 
 	})
 });

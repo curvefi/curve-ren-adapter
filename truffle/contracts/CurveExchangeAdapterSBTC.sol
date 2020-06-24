@@ -877,7 +877,7 @@ contract CurveExchangeAdapter is GSNRecipient {
         bytes32 _nHash,
         bytes calldata _sig
     ) external discountCHI {
-        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _j, __wbtcDestination, _msgSender()));
+        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _j, _wbtcDestination, _msgSender()));
         uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
         
         require(coins[0].transfer(_wbtcDestination, mintedAmount));
