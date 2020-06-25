@@ -240,23 +240,6 @@ contract CurveExchangeAdapter {
         emit ReceiveRen(mintedAmount);
     }
 
-    function mintNoSwapRecover(
-        uint256 _minExchangeRate,
-        uint256 _newMinExchangeRate,
-        uint256 _slippage,
-        int128 _j,
-        address payable _wbtcDestination,
-        uint256 _amount,
-        bytes32 _nHash,
-        bytes calldata _sig
-    ) external discountCHI {
-        bytes32 pHash = keccak256(abi.encode(_minExchangeRate, _slippage, _j, _wbtcDestination, msg.sender));
-        uint256 mintedAmount = registry.getGatewayBySymbol("BTC").mint(pHash, _amount, _nHash, _sig);
-        
-        require(RENBTC.transfer(_wbtcDestination, mintedAmount));
-        emit ReceiveRen(mintedAmount);
-    }
-
     function mintNoDeposit(
         address payable _wbtcDestination, 
         uint256 _amount, 
