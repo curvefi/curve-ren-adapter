@@ -51,11 +51,12 @@ contract BasicMetaTransaction {
 
 
 
-    function verify(address owner, string memory message, string memory length, uint256 chainID, uint256 nonce,
+    function verify(address owner, string memory message, string memory length, uint256 nonce, uint256 chainID,
         bytes32 sigR, bytes32 sigS, uint8 sigV) public view returns (bool) {
 
         string memory nonceStr = uint2str(nonce);
-        bytes32 hash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", length, message, nonceStr, chainID));
+        string memory chainIDStr = uint2str(chainIDStr);
+        bytes32 hash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", length, message, nonceStr, chainIDStr));
 		return (owner == ecrecover(hash, sigV, sigR, sigS));
     }
 
