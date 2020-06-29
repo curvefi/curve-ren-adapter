@@ -82,7 +82,7 @@ interface IFreeFromUpTo {
     function approve(address spender, uint256 amount) external returns (bool);
 }
 
-contract CurveExchangeAdapter {
+contract CurveExchangeAdapterSBTC {
     using SafeMath for uint256;
 
     IFreeFromUpTo public constant chi = IFreeFromUpTo(0x0000000000004946c0e9F43F4Dee607b0eF1fA1c);

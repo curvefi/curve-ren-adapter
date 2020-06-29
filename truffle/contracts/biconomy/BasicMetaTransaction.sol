@@ -10,7 +10,7 @@ contract BasicMetaTransaction {
     event MetaTransactionExecuted(address userAddress, address payable relayerAddress, bytes functionSignature);
     mapping(address => uint256) nonces;
     
-    function getChainID() external view returns (uint256) {
+    function getChainID() public pure returns (uint256) {
         uint256 id;
         assembly {
             id := chainid()
@@ -35,9 +35,7 @@ contract BasicMetaTransaction {
         bytes memory functionSignature, string memory message, string memory length,
         bytes32 sigR, bytes32 sigS, uint8 sigV) public payable returns(bytes memory) {
 
-        uint256 chainID = this.getChainID();
-
-        require(verify(userAddress, message, length, nonces[userAddress], chainID, sigR, sigS, sigV), "Signer and signature do not match");
+        require(verify(userAddress, message, length, nonces[userAddress], getChainID(), sigR, sigS, sigV), "Signer and signature do not match");
         // Append userAddress and relayer address at the end to extract it from calling context
         (bool success, bytes memory returnData) = address(this).call(abi.encodePacked(functionSignature, userAddress));
 

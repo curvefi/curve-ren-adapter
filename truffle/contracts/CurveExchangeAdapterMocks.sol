@@ -8,7 +8,7 @@
 
 // // File: github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/GSN/Context.sol
 
-// pragma solidity ^0.5.0;
+// pragma solidity ^0.6.0;
 
 // import './SafeMath.sol';
 // import './Token.sol';
@@ -55,7 +55,7 @@
 
 // // File: github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/GSN/IRelayHub.sol
 
-// pragma solidity ^0.5.0;
+// pragma solidity ^0.6.0;
 
 // /**
 //  * @dev Interface for `RelayHub`, the core contract of the GSN. Users should not need to interact with this contract
@@ -325,7 +325,7 @@
 
 // // File: github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/GSN/IRelayRecipient.sol
 
-// pragma solidity ^0.5.0;
+// pragma solidity ^0.6.0;
 
 // /**
 //  * @dev Base interface for a contract that will be called via the GSN from {IRelayHub}.
@@ -402,7 +402,7 @@
 
 // // File: github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/GSN/GSNRecipient.sol
 
-// pragma solidity ^0.5.0;
+// pragma solidity ^0.6.0;
 
 
 
