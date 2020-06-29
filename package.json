@@ -1,0 +1,22 @@
+{
+  "name": "curverenadapter",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pengiundev/CurveExchangeAdapter.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/pengiundev/CurveExchangeAdapter/issues"
+  },
+  "homepage": "https://github.com/pengiundev/CurveExchangeAdapter#readme",
+  "description": "",
+  "dependencies": {
+    "@opengsn/gsn": "^0.10.0"
+  }
+}
