@@ -12,7 +12,7 @@ pragma solidity ^0.6.0;
 
 import './SafeMath.sol';
 
-import './biconomy/EIP712MetaTransaction.sol';
+import './biconomy/BasicMetaTransaction.sol';
 
 /*
  * @dev Provides information about the current execution context, including the
@@ -96,7 +96,7 @@ interface IFreeFromUpTo {
     function approve(address spender, uint256 amount) external returns (bool);
 }
 
-contract CurveExchangeAdapter is EIP712MetaTransaction("CurveExchangeAdapter", "1") {
+contract CurveExchangeAdapter is BasicMetaTransaction {
     using SafeMath for uint256;
 
     IFreeFromUpTo public constant chi = IFreeFromUpTo(0x0000000000004946c0e9F43F4Dee607b0eF1fA1c);
