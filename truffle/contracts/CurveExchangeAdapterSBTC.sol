@@ -15,31 +15,6 @@ import './biconomy/BasicMetaTransaction.sol';
 
 // File: browser/dex-adapter-simple.sol
 
-library Math {
-    /**
-     * @dev Returns the largest of two numbers.
-     */
-    function max(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a >= b ? a : b;
-    }
-
-    /**
-     * @dev Returns the smallest of two numbers.
-     */
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
-    }
-
-    /**
-     * @dev Returns the average of two numbers. The result is rounded towards
-     * zero.
-     */
-    function average(uint256 a, uint256 b) internal pure returns (uint256) {
-        // (a + b) / 2 can overflow, so we distribute
-        return (a / 2) + (b / 2) + ((a % 2 + b % 2) / 2);
-    }
-}
-
 interface IERC20 {
     function transfer(address recipient, uint256 amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
@@ -112,10 +87,10 @@ contract CurveExchangeAdapterSBTC is BasicMetaTransaction {
     ICurveExchange public exchange;  
     IGatewayRegistry public registry;
 
-    event SwapReceived(uint256 mintedAmount, uint256 erc20BTCAmount, int128 j);
-    event DepositMintedCurve(uint256 mintedAmount, uint256 curveAmount, uint256[N_COINS] amounts);
-    event ReceiveRen(uint256 renAmount);
-    event Burn(uint256 burnAmount);
+    event SwapReceived(address indexed from, uint256 mintedAmount, uint256 erc20BTCAmount, int128 j);
+    event DepositMintedCurve(address indexed from, uint256 mintedAmount, uint256 curveAmount, uint256[N_COINS] amounts);
+    event ReceiveRen(address indexed from, uint256 renAmount);
+    event Burn(address indexed from, uint256 burnAmount);
 
     constructor(ICurveExchange _exchange, address _curveTokenAddress, IGatewayRegistry _registry, IERC20[N_COINS] memory _coins) public {
         exchange = _exchange;
@@ -173,7 +148,7 @@ contract CurveExchangeAdapterSBTC is BasicMetaTransaction {
         } else {
             //Send renBTC to the User instead
             require(coins[0].transfer(_coinDestination, mintedAmount));
-            emit ReceiveRen(mintedAmount);
+            emit ReceiveRen(msgSender(), mintedAmount);
         }
     }
 
@@ -185,7 +160,7 @@ contract CurveExchangeAdapterSBTC is BasicMetaTransaction {
     
         //Send proceeds to the User
         require(coins[uint256(_j)].transfer(_coinDestination, bought));
-        emit SwapReceived(_mintedAmount, bought, _j);
+        emit SwapReceived(msgSender(), _mintedAmount, bought, _j);
     }
 
     function mintThenDeposit(
@@ -208,12 +183,12 @@ contract CurveExchangeAdapterSBTC is BasicMetaTransaction {
         for(uint256 i = 1; i < N_COINS; i++) {
             receivedAmounts[i] = _amounts[i];
         }
-        if(exchange.calc_token_amount(_amounts, true) >= _new_min_mint_amount) {
+        if(exchange.calc_token_amount(receivedAmounts, true) >= _new_min_mint_amount) {
             doDeposit(receivedAmounts, mintedAmount, _new_min_mint_amount, _wbtcDestination);
         }
         else {
             require(coins[0].transfer(_wbtcDestination, mintedAmount));
-            emit ReceiveRen(mintedAmount);
+            emit ReceiveRen(msgSender(), mintedAmount);
         }
     }
 
@@ -229,7 +204,7 @@ contract CurveExchangeAdapterSBTC is BasicMetaTransaction {
         uint256 curveAmount = curveBalanceAfter.sub(curveBalanceBefore);
         require(curveAmount >= _new_min_mint_amount);
         require(curveToken.transfer(_wbtcDestination, curveAmount));
-        emit DepositMintedCurve(mintedAmount, curveAmount, receivedAmounts);
+        emit DepositMintedCurve(msgSender(), mintedAmount, curveAmount, receivedAmounts);
     }
 
     // function mintNoSwap(
@@ -284,7 +259,7 @@ contract CurveExchangeAdapterSBTC is BasicMetaTransaction {
 
         // Burn and send proceeds to the User
         uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, balances[0]);
-        emit Burn(burnAmount);
+        emit Burn(msgSender(), burnAmount);
     }
 
     function removeLiquidityImbalanceThenBurn(bytes calldata _btcDestination, address _coinDestination, uint256[N_COINS] calldata amounts, uint256 max_burn_amount) external discountCHI {
@@ -304,17 +279,20 @@ contract CurveExchangeAdapterSBTC is BasicMetaTransaction {
 
         for(uint256 i = 0; i < coins.length; i++) {
             balances[i] = coins[i].balanceOf(address(this)).sub(balances[i]);
-            if(i == 0) continue;
+            if(i == 0 || balances[i] == 0) continue;
             require(coins[i].transfer(_coinDestination, balances[i]));
         }
 
-        // Burn and send proceeds to the User
-        uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, balances[0]);
-        emit Burn(burnAmount);
+        if(balances[0] > 0) {
+            // Burn and send proceeds to the User
+            uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, balances[0]);
+            emit Burn(msgSender(), burnAmount);
+        }
     }
 
     //always removing in renBTC, else use normal method
     function removeLiquidityOneCoinThenBurn(bytes calldata _btcDestination, uint256 _token_amounts, uint256 min_amount, uint8 _i) external discountCHI {
+        require(_i == 0, "BTC adapter can burn renBTC only");
         uint256 startRenbtcBalance = coins[0].balanceOf(address(this));
         require(curveToken.transferFrom(msgSender(), address(this), _token_amounts));
         exchange.remove_liquidity_one_coin(_token_amounts, _i, min_amount);
@@ -323,7 +301,7 @@ contract CurveExchangeAdapterSBTC is BasicMetaTransaction {
 
         // Burn and send proceeds to the User
         uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcWithdrawn);
-        emit Burn(burnAmount);
+        emit Burn(msgSender(), burnAmount);
     }
     
     function swapThenBurn(bytes calldata _btcDestination, uint256 _amount, uint256 _minRenbtcAmount, uint8 _i) external discountCHI {
@@ -335,6 +313,6 @@ contract CurveExchangeAdapterSBTC is BasicMetaTransaction {
         
         // Burn and send proceeds to the User
         uint256 burnAmount = registry.getGatewayBySymbol("BTC").burn(_btcDestination, renbtcBought);
-        emit Burn(burnAmount);
+        emit Burn(msgSender(), burnAmount);
     }
 }
