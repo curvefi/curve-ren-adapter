@@ -17,6 +17,6 @@
   "homepage": "https://github.com/pengiundev/CurveExchangeAdapter#readme",
   "description": "",
   "dependencies": {
-    "@opengsn/gsn": "^0.10.0"
+    "@opengsn/gsn": "^2.1.0"
   }
 }
